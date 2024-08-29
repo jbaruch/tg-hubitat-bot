@@ -1,5 +1,5 @@
-package jbaru.ch.telegram.hubitat
-
+import jbaru.ch.telegram.hubitat.DeviceManager
+import jbaru.ch.telegram.hubitat.model.Device
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -10,67 +10,80 @@ class DeviceManagerTest {
 
     @BeforeEach
     fun setUp() {
-        val deviceListJson = """[
-            {"id": 1, "label": "Living Room Lights"},
-            {"id": 2, "label": "Kitchen Lights"},
-            {"id": 3, "label": "Bedroom Light"},
-            {"id": 4, "label": "Garage Door"},
-            {"id": 5, "label": "Baruch Office Light"}
-        ]"""
+        // Simplified JSON data for devices
+        val deviceListJson = """
+            [
+                {"id": 1, "label": "Living Room Lights", "type": "Room Lights Activator Bulb"},
+                {"id": 2, "label": "Kitchen Lights", "type": "Room Lights Activator Dimmer"},
+                {"id": 3, "label": "Bedroom Light", "type": "Room Lights Activator Switch"},
+                {"id": 4, "label": "Garage Door", "type": "Virtual Switch"},
+                {"id": 5, "label": "Baruch Office Light", "type": "Room Lights Activator Shade"},
+                {"id": 6, "label": "Master Bedroom Shades", "type": "Room Lights Activator Shade"}
+            ]
+        """.trimIndent()
+
         deviceManager = DeviceManager(deviceListJson)
     }
 
     @Test
-    fun `test find device by full name`() {
-        val result = deviceManager.findDevice("Living Room Lights")
+    fun `test finding devices by full name`() {
+        val result = deviceManager.findDevice("Living Room Lights", "on")
         assertTrue(result.isSuccess)
-        assertEquals(1, result.getOrNull())
+        assertEquals(1, result.getOrNull()?.id)
     }
 
     @Test
-    fun `test find device by name without Light or Lights`() {
-        val result = deviceManager.findDevice("Living Room")
+    fun `test finding devices by short name`() {
+        val result = deviceManager.findDevice("Kitchen", "off")
         assertTrue(result.isSuccess)
-        assertEquals(1, result.getOrNull())
+        assertEquals(2, result.getOrNull()?.id)
     }
 
     @Test
-    fun `test find device by exact match`() {
-        val result = deviceManager.findDevice("Garage Door")
+    fun `test finding devices by abbreviation`() {
+        val result = deviceManager.findDevice("lrl", "on")
         assertTrue(result.isSuccess)
-        assertEquals(4, result.getOrNull())
+        assertEquals(1, result.getOrNull()?.id)
     }
 
     @Test
-    fun `test find device with case insensitivity`() {
-        val result = deviceManager.findDevice("kitchen lights")
+    fun `test not finding non-existent device`() {
+        val result = deviceManager.findDevice("NonExistentDevice", "on")
+        assertTrue(result.isFailure)
+    }
+
+    @Test
+    fun `test sending correct command to device`() {
+        val result = deviceManager.findDevice("Bedroom Light", "on")
         assertTrue(result.isSuccess)
-        assertEquals(2, result.getOrNull())
+        assertEquals(3, result.getOrNull()?.id)
     }
 
     @Test
-    fun `test find non-existent device`() {
-        val result = deviceManager.findDevice("Non Existent Device")
-        assertFalse(result.isSuccess)
+    fun `test sending incorrect command to device`() {
+        val result = deviceManager.findDevice("Bedroom Light", "open")
+        assertTrue(result.isFailure)
+        assertEquals("Command 'open' is not supported by device 'Bedroom Light'", result.exceptionOrNull()?.message)
     }
 
     @Test
-    fun `test find device by camel case abbreviation`() {
-        val result = deviceManager.findDevice("LRL")
+    fun `test finding device but unsupported command`() {
+        val result = deviceManager.findDevice("Garage Door", "dim")
+        assertTrue(result.isFailure)
+        assertEquals("Command 'dim' is not supported by device 'Garage Door'", result.exceptionOrNull()?.message)
+    }
+
+    @Test
+    fun `test shade device with correct command`() {
+        val result = deviceManager.findDevice("Baruch Office Light", "open")
         assertTrue(result.isSuccess)
-        assertEquals(1, result.getOrNull())
+        assertEquals(5, result.getOrNull()?.id)
     }
 
     @Test
-    fun `test find device by abbreviation case insensitivity`() {
-        val result = deviceManager.findDevice("kl")
-        assertTrue(result.isSuccess)
-        assertEquals(2, result.getOrNull())
-    }
-
-    @Test
-    fun `test find non-existent abbreviation`() {
-        val result = deviceManager.findDevice("XYZ")
-        assertFalse(result.isSuccess)
+    fun `test shade device with incorrect command`() {
+        val result = deviceManager.findDevice("Master Bedroom Shades", "on")
+        assertTrue(result.isFailure)
+        assertEquals("Command 'on' is not supported by device 'Master Bedroom Shades'", result.exceptionOrNull()?.message)
     }
 }

@@ -53,7 +53,7 @@ class DeviceManager(deviceListJson: String) {
         val device = deviceCache[normalizedQuery]
 
         if (device != null) {
-            return if (device.SUPPORTED_OPS.contains(command)) {
+            return if (device.supportedOps.contains(command)) {
                 Result.success(device)
             } else {
                 Result.failure(IllegalArgumentException("Command '$command' is not supported by device '${device.label}'"))

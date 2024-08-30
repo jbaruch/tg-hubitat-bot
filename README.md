@@ -1,11 +1,11 @@
 ## Telegram Bot for Hubitat Elevation.
 ### Currently Supported Commands:
-* /on [device to turn on]
-* /off [device to turn off]
-* /open [device to open]
-* /close [device to close]
-* /cancel_alerts - Cancels all alerts in HSM
-* /update - Updates all hubs for which Hub Information Drivers are exposed in the Maker API of `hubitat.local`
+* `/on [device to turn on]`
+* `/off [device to turn off]`
+* `/open [device to open]`
+* `/close [device to close]`
+* `/cancel_alerts` - Cancels all alerts in HSM
+* `/update` - Updates all hubs for which Hub Information Drivers are exposed in the Maker API of `hubitat.local`
 
 ### Prerequisites and Setup:
 1. Install the Maker API app on the `hubitat.local` hub.

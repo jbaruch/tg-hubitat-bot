@@ -45,7 +45,7 @@ You can refer to devices in several ways:
 * `MAKER_API_APP_ID` - The Maker API app ID.
 * `MAKER_API_TOKEN` - The Maker API token.
 * `BOT_TOKEN` - The Telegram bot token.
-7. Deploy the Docker image:
+8. Deploy the Docker image:
   - Load the Docker image: `docker load < tg-hubitat-bot-docker-image.tar`
   - Create and run the container: `docker run -d --name tg-hubitat-bot -e MAKER_API_APP_ID -e MAKER_API_TOKEN -e BOT_TOKEN tg-hubitat-bot`
 

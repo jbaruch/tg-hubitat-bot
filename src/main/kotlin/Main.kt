@@ -10,21 +10,15 @@ import io.ktor.client.call.body
 import io.ktor.client.engine.cio.*
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
-import jbaru.ch.telegram.hubitat.commands.DeviceRepositoryFactoryImpl
+import jbaru.ch.telegram.hubitat.factories.DeviceRepositoryFactoryImpl
 import jbaru.ch.telegram.hubitat.domain.*
-import jbaru.ch.telegram.hubitat.model.Constants.Companion.CANCEL_ALERTS
-import jbaru.ch.telegram.hubitat.model.Constants.Companion.CLOSE
-import jbaru.ch.telegram.hubitat.model.Constants.Companion.OFF
-import jbaru.ch.telegram.hubitat.model.Constants.Companion.ON
-import jbaru.ch.telegram.hubitat.model.Constants.Companion.OPEN
-import jbaru.ch.telegram.hubitat.model.Constants.Companion.UPDATE
-import jbaru.ch.telegram.hubitat.model.Device
+import jbaru.ch.telegram.hubitat.models.Constants.Companion.CANCEL_ALERTS
+import jbaru.ch.telegram.hubitat.models.Constants.Companion.CLOSE
+import jbaru.ch.telegram.hubitat.models.Constants.Companion.OFF
+import jbaru.ch.telegram.hubitat.models.Constants.Companion.ON
+import jbaru.ch.telegram.hubitat.models.Constants.Companion.OPEN
+import jbaru.ch.telegram.hubitat.models.Constants.Companion.UPDATE
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import java.lang.System.getenv
 
 

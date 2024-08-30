@@ -1,4 +1,4 @@
-package jbaru.ch.telegram.hubitat.commands
+package jbaru.ch.telegram.hubitat.factories
 
 import jbaru.ch.telegram.hubitat.DeviceRepository
 import jbaru.ch.telegram.hubitat.DeviceRepositoryImpl

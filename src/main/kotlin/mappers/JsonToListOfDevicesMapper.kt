@@ -1,6 +1,6 @@
 package jbaru.ch.telegram.hubitat.mappers
 
-import jbaru.ch.telegram.hubitat.model.Device
+import jbaru.ch.telegram.hubitat.models.Device
 import kotlinx.serialization.json.Json
 
 fun interface JsonToListOfDevicesMapper : Mapper<String, List<Device>>

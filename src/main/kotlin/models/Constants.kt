@@ -1,4 +1,4 @@
-package jbaru.ch.telegram.hubitat.model
+package jbaru.ch.telegram.hubitat.models
 
 class Constants {
     companion object {

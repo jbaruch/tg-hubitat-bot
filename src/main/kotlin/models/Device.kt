@@ -1,11 +1,11 @@
 @file:Suppress("unused")
 
-package jbaru.ch.telegram.hubitat.model
-import jbaru.ch.telegram.hubitat.model.Constants.Companion.CLOSE
-import jbaru.ch.telegram.hubitat.model.Constants.Companion.OFF
-import jbaru.ch.telegram.hubitat.model.Constants.Companion.ON
-import jbaru.ch.telegram.hubitat.model.Constants.Companion.OPEN
-import jbaru.ch.telegram.hubitat.model.Constants.Companion.REBOOT
+package jbaru.ch.telegram.hubitat.models
+import jbaru.ch.telegram.hubitat.models.Constants.Companion.CLOSE
+import jbaru.ch.telegram.hubitat.models.Constants.Companion.OFF
+import jbaru.ch.telegram.hubitat.models.Constants.Companion.ON
+import jbaru.ch.telegram.hubitat.models.Constants.Companion.OPEN
+import jbaru.ch.telegram.hubitat.models.Constants.Companion.REBOOT
 import kotlinx.serialization.*
 
 @Serializable

@@ -1,6 +1,6 @@
 package jbaru.ch.telegram.hubitat.mappers
 
-import jbaru.ch.telegram.hubitat.model.Device
+import jbaru.ch.telegram.hubitat.models.Device
 
 interface DeviceListToMapMapper : Mapper<List<Device>, MutableMap<String, Device>>
 

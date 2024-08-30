@@ -6,10 +6,11 @@ import kotlinx.serialization.json.Json
 class DeviceManager(deviceListJson: String) {
 
     private val deviceCache: MutableMap<String, Device> = mutableMapOf()
+    private val devices: List<Device>
 
     init {
         val format = Json { ignoreUnknownKeys = true }
-        val devices = format.decodeFromString<List<Device>>(deviceListJson)
+        devices = format.decodeFromString<List<Device>>(deviceListJson)
         initializeCache(devices)
     }
 
@@ -61,5 +62,13 @@ class DeviceManager(deviceListJson: String) {
         }
 
         return Result.failure(Exception("No device found for query: $name"))
+    }
+
+    fun <T : Device> findDevicesByType(type: Class<T>): List<T> {
+        return devices.filterIsInstance(type)
+    }
+
+    override fun toString(): String {
+        return devices.size.toString()
     }
 }

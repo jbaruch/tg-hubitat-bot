@@ -21,6 +21,12 @@ sealed class Device {
     }
 
     @Serializable
+    @SerialName("Hub Information Driver v3")
+    data class Hub(override val id:Int, override val label: String, var managementToken:String = "", var ip:String = "") : Device() {
+        override val supportedOps: List<String> = listOf("reboot")
+    }
+
+    @Serializable
     @SerialName("Virtual Switch")
     data class VirtualSwitch (override val id: Int, override val label: String) : Actuator()
 

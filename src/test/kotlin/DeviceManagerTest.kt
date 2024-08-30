@@ -86,4 +86,15 @@ class DeviceManagerTest {
         assertTrue(result.isFailure)
         assertEquals("Command 'on' is not supported by device 'Master Bedroom Shades'", result.exceptionOrNull()?.message)
     }
+
+    @Test
+    fun `test finding devices by type`() {
+        val bulbs = deviceManager.findDevicesByType(Device.RoomLightsActivatorBulb::class.java)
+        assertEquals(1, bulbs.size)
+        assertEquals("Living Room Lights", bulbs.first().label)
+
+        val switches = deviceManager.findDevicesByType(Device.VirtualSwitch::class.java)
+        assertEquals(1, switches.size)
+        assertEquals("Garage Door", switches.first().label)
+    }
 }

@@ -58,6 +58,7 @@ fun main() {
             command("off") { parseCommandWithArgs("off") }
             command("open") { parseCommandWithArgs("open") }
             command("close") { parseCommandWithArgs("close") }
+            command("reboot") {parseCommandWithArgs("reboot") }
 
             command("cancel_alerts") {
                 bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = runCommandOnHsm("cancelAlerts"))
@@ -74,7 +75,6 @@ fun main() {
             }
         }
     }
-
     println("Init successful, $deviceManager devices loaded, start polling")
     bot.startPolling()
 }

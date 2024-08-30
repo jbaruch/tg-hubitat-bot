@@ -35,10 +35,7 @@ fun main() {
 
     deviceManager = runBlocking {
         DeviceManager(client.get("http://hubitat.local/apps/api/${MAKER_API_APP_ID}/devices") {
-            parameter(
-                "access_token",
-                MAKER_API_TOKEN
-            )
+            parameter("access_token", MAKER_API_TOKEN)
         }.body())
     }
     hubs = runBlocking { initHubs() }
@@ -67,7 +64,13 @@ fun main() {
             }
 
             command("update") {
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = updateHubs().toString())
+                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = updateHubs().fold(
+                    onSuccess = { it },
+                    onFailure = {
+                        it.printStackTrace()
+                        it.message.toString()
+                    }
+                ))
             }
         }
     }
@@ -80,23 +83,18 @@ suspend fun runCommandOnDevice(command: String, device: String): String =
     deviceManager.findDevice(device, command).fold(
         onSuccess = { device ->
             client.get("http://hubitat.local/apps/api/${MAKER_API_APP_ID}/devices/${device.id}/$command") {
-                parameter(
-                    "access_token",
-                    MAKER_API_TOKEN
-                )
+                parameter("access_token", MAKER_API_TOKEN)
             }.status.description
         },
         onFailure = {
+            it.printStackTrace()
             it.message.toString()
         }
     )
 
 suspend fun runCommandOnHsm(command: String): String {
     return client.get("http://hubitat.local/apps/api/${MAKER_API_APP_ID}/hsm/$command") {
-        parameter(
-            "access_token",
-            MAKER_API_TOKEN
-        )
+        parameter("access_token", MAKER_API_TOKEN)
     }.status.description
 }
 
@@ -118,33 +116,29 @@ suspend fun updateHubs(): Result<String> {
         Result.success("All hub updates initialized successfully.")
     } else {
         val failureMessages = failures.entries.joinToString("\n") { (name, status) ->
-            "Failed to update hub ${name} Status: $status"
+            "Failed to update hub $name Status: $status"
         }
         val successMessages = statusMap.filterValues { it == HttpStatusCode.OK }
             .entries.joinToString("\n") { (name, _) ->
-                "Successfully issued update request to hub ${name}"
+                "Successfully issued update request to hub $name"
             }
         Result.failure(Exception("$failureMessages\n$successMessages"))
     }
 }
 
 private suspend fun initHubs(): List<Device.Hub> {
-
     val hubs = deviceManager.findDevicesByType(Device.Hub::class.java)
+    for (hub in hubs) {
+        val json: Map<String, JsonElement> =
+            Json.parseToJsonElement(client.get("http://hubitat.local/apps/api/${MAKER_API_APP_ID}/devices/${hub.id}") {
+                parameter("access_token", MAKER_API_TOKEN)
+            }.body<String>()).jsonObject
 
-    for(hub in hubs) {
-        val json: Map<String, JsonElement> = Json.parseToJsonElement(client.get("http://hubitat.local/apps/api/${MAKER_API_APP_ID}/devices/${hub.id}") {
-            parameter(
-                "access_token",
-                MAKER_API_TOKEN
-            )
-         }.body<String>()).jsonObject
-
-        val ip = (json.get("attributes") as JsonArray).find {
-            it.jsonObject.get("name").toString().contains("localIP")
-        }?.jsonObject?.get("currentValue")?.jsonPrimitive?.content.toString()
+        val ip = (json["attributes"] as JsonArray).find {
+            it.jsonObject["name"]!!.jsonPrimitive.content.toString() == "localIP"
+        }!!.jsonObject["currentValue"]!!.jsonPrimitive.content.toString()
         hub.ip = ip
-        hub.managementToken =  client.get("http://${ip}/hub/advanced/getManagementToken").body()
+        hub.managementToken = client.get("http://${ip}/hub/advanced/getManagementToken").body()
     }
     return hubs
 }

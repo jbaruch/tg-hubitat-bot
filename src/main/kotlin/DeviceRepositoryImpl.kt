@@ -1,6 +1,6 @@
 package jbaru.ch.telegram.hubitat
 
-import jbaru.ch.telegram.hubitat.model.Device
+import jbaru.ch.telegram.hubitat.models.Device
 
 interface DeviceRepository {
     fun findDevice(name: String, command: String): Result<Device>

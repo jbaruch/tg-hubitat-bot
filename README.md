@@ -12,9 +12,9 @@
 * `/off [device to turn off]` - Turns off a specified device.
   - Example: `/off Porch Light`
 * `/open [device to open]` - Opens a specified device (e.g., shades).
-  - Example: `/open Garage Door`
+  - Example: `/open Loft Shades`
 * `/close [device to close]` - Closes a specified device.
-  - Example: `/close Garage Door`
+  - Example: `/close Loft Shades`
 * `/cancel_alerts` - Cancels all alerts in HSM.
 * `/update` - Updates all hubs for which Hub Information Drivers are exposed in the Maker API of `hubitat.local`.
 

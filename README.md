@@ -17,6 +17,7 @@
   - Example: `/close Loft Shades`
 * `/cancel_alerts` - Cancels all alerts in HSM.
 * `/update` - Updates all hubs for which Hub Information Drivers are exposed in the Maker API of `hubitat.local`.
+* `/reboot [Hub Information Driver v3 instance name to reboot]` - Reboots a specified hub.
 
 ## Device Name Notations:
 You can refer to devices in several ways:
@@ -39,7 +40,8 @@ You can refer to devices in several ways:
 3. Expose all needed devices in Maker API (including devices from other hubs via mesh).
 4. Ensure Hub Information Driver v3 is installed on every hub (via Hubitat Package Manager) and exposed in Maker API on `hubitat.local` (directly and via mesh).
 5. Create a bot in Telegram using BotFather bot.
-6. Configure environment variables:
+6. Add the commands using `setcommands` in BotFather.
+7. Configure environment variables:
 * `MAKER_API_APP_ID` - The Maker API app ID.
 * `MAKER_API_TOKEN` - The Maker API token.
 * `BOT_TOKEN` - The Telegram bot token.

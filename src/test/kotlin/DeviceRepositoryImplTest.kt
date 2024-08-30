@@ -1,6 +1,6 @@
 import jbaru.ch.telegram.hubitat.DeviceRepository
 import jbaru.ch.telegram.hubitat.factories.DeviceRepositoryFactoryImpl
-import jbaru.ch.telegram.hubitat.model.Device
+import jbaru.ch.telegram.hubitat.models.Device
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test

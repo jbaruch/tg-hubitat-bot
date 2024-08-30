@@ -35,13 +35,14 @@ You can refer to devices in several ways:
 
 
 ## Prerequisites and Setup:
-1. Install the Maker API app on the `hubitat.local` hub.
-2. Ensure Maker API control of HSM is allowed for `/cancel_alerts`.
-3. Expose all needed devices in Maker API (including devices from other hubs via mesh).
-4. Ensure Hub Information Driver v3 is installed on every hub (via Hubitat Package Manager) and exposed in Maker API on `hubitat.local` (directly and via mesh).
-5. Create a bot in Telegram using BotFather bot.
-6. Add the commands using `setcommands` in BotFather.
-7. Configure environment variables:
+1. For hubs updates: Hubitat version 2.3.9.175 or higher.
+2. Install the Maker API app on the `hubitat.local` hub.
+3. Ensure Maker API control of HSM is allowed for `/cancel_alerts`.
+4. Expose all needed devices in Maker API (including devices from other hubs via mesh).
+5. Ensure Hub Information Driver v3 is installed on every hub (via Hubitat Package Manager) and exposed in Maker API on `hubitat.local` (directly and via mesh).
+6. Create a bot in Telegram using BotFather bot.
+7. Add the commands using `setcommands` in BotFather.
+8. Configure environment variables:
 * `MAKER_API_APP_ID` - The Maker API app ID.
 * `MAKER_API_TOKEN` - The Maker API token.
 * `BOT_TOKEN` - The Telegram bot token.

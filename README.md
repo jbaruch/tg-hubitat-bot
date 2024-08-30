@@ -22,7 +22,7 @@
 ### Adding New Device Types and Building From Source:
 It's almost certain that you'll need to add new device types to the JSON hierarchy to support your devices. 
 [Device.tk](https://github.com/jbaruch/tg-hubitat-bot/blob/main/src/main/kotlin/model/Device.kt) contains the list of supported devices in the form of classes with their abilities. 
-As currently, only actuators and shades are supported, so all the concrete device implementations extend from either jbaru.ch.telegram.hubitat.model.Device.Actuator or jbaru.ch.telegram.hubitat.model.Device.Shade (except Hub).
+As currently, only actuators and shades are supported, so all the concrete device implementations extend from either `jbaru.ch.telegram.hubitat.model.Device.Actuator` or `jbaru.ch.telegram.hubitat.model.Device.Shade` (except `jbaru.ch.telegram.hubitat.model.Device.Hub`).
 Add another class that extends from the relevant abstract class (to provide support for the correct commands) and enter the device type from Hubitat in the `@SerialName` annotation. Done.
 
 Run `./gradlew build` to build a regular JVM project, `./gradlew jibDockerBuild` to build a docker container, and `./gradlew jibBuildTar` to create a portable tar of the container.

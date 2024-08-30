@@ -10,7 +10,14 @@ import io.ktor.client.call.body
 import io.ktor.client.engine.cio.*
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
-import io.ktor.http.HttpStatusCode
+import jbaru.ch.telegram.hubitat.commands.DeviceRepositoryFactoryImpl
+import jbaru.ch.telegram.hubitat.domain.*
+import jbaru.ch.telegram.hubitat.model.Constants.Companion.CANCEL_ALERTS
+import jbaru.ch.telegram.hubitat.model.Constants.Companion.CLOSE
+import jbaru.ch.telegram.hubitat.model.Constants.Companion.OFF
+import jbaru.ch.telegram.hubitat.model.Constants.Companion.ON
+import jbaru.ch.telegram.hubitat.model.Constants.Companion.OPEN
+import jbaru.ch.telegram.hubitat.model.Constants.Companion.UPDATE
 import jbaru.ch.telegram.hubitat.model.Device
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -21,124 +28,79 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.lang.System.getenv
 
 
-private val BOT_TOKEN = getenv("BOT_TOKEN") ?: throw IllegalStateException("BOT_TOKEN not set")
-private val MAKER_API_APP_ID = getenv("MAKER_API_APP_ID") ?: throw IllegalStateException("MAKER_API_APP_ID not set")
-private val MAKER_API_TOKEN = getenv("MAKER_API_TOKEN") ?: throw IllegalStateException("MAKER_API_TOKEN not set")
-
-private lateinit var hubs: List<Device.Hub>
-
-private val client = HttpClient(CIO)
-
-private lateinit var deviceManager: DeviceManager
+internal val BOT_TOKEN = getenv("BOT_TOKEN") ?: throw IllegalStateException("BOT_TOKEN not set")
+internal val MAKER_API_APP_ID = getenv("MAKER_API_APP_ID") ?: throw IllegalStateException("MAKER_API_APP_ID not set")
+internal val MAKER_API_TOKEN = getenv("MAKER_API_TOKEN") ?: throw IllegalStateException("MAKER_API_TOKEN not set")
 
 fun main() {
-
-    deviceManager = runBlocking {
-        DeviceManager(client.get("http://hubitat.local/apps/api/${MAKER_API_APP_ID}/devices") {
-            parameter("access_token", MAKER_API_TOKEN)
-        }.body())
+    val client = HttpClient(CIO) {}
+    val deviceRepository = runBlocking {
+        DeviceRepositoryFactoryImpl().create(
+            client.get("http://hubitat.local/apps/api/${MAKER_API_APP_ID}/devices") {
+                parameter("access_token", MAKER_API_TOKEN)
+            }.body()
+        )
     }
-    hubs = runBlocking { initHubs() }
+    val initHubs = InitHubsCommandImpl()
+    val hubs = runBlocking { initHubs(InitHubsCommand.Param(client, deviceRepository)) }
 
     val bot = bot {
         token = BOT_TOKEN
 
         suspend fun CommandHandlerEnvironment.parseCommandWithArgs(command: String) {
-            (if (args.isEmpty()) {
-                "Specify what do you want to $command"
-            } else {
-                runCommandOnDevice(command, args.joinToString(" "))
-            }).also {
+            when (args.isEmpty()) {
+                true -> "Specify what do you want to $command"
+                false -> RunCommandOnDeviceImpl().invoke(
+                    RunCommandOnDevice.Param(
+                        deviceRepository,
+                        client,
+                        command,
+                        args.joinToString(" "),
+                    )
+                )
+            }.also {
                 bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = it)
             }
         }
 
         dispatch {
-            command("on") { parseCommandWithArgs("on") }
-            command("off") { parseCommandWithArgs("off") }
-            command("open") { parseCommandWithArgs("open") }
-            command("close") { parseCommandWithArgs("close") }
+            command(ON) { parseCommandWithArgs(ON) }
+            command(OFF) { parseCommandWithArgs(OFF) }
+            command(OPEN) { parseCommandWithArgs(OPEN) }
+            command(CLOSE) { parseCommandWithArgs(CLOSE) }
 
-            command("cancel_alerts") {
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = runCommandOnHsm("cancelAlerts"))
+            command(CANCEL_ALERTS) {
+                bot.sendMessage(
+                    chatId = ChatId.fromId(message.chat.id),
+                    text = RunCommandOnHsmImpl()
+                        .invoke(
+                            RunCommandOnHsm.Param(
+                                client, "cancelAlerts"
+                            )
+                        )
+                )
             }
 
-            command("update") {
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = updateHubs().fold(
-                    onSuccess = { it },
-                    onFailure = {
-                        it.printStackTrace()
-                        it.message.toString()
-                    }
-                ))
+            command(UPDATE) {
+                bot.sendMessage(
+                    chatId = ChatId.fromId(message.chat.id),
+                    text = UpdateHubsCommandImpl().invoke(
+                        UpdateHubsCommand.Param(
+                            hubs,
+                            client,
+                        )
+                    ).fold(
+                        onSuccess = { it },
+                        onFailure = {
+                            it.printStackTrace()
+                            it.message.toString()
+                        }
+                    ))
             }
         }
     }
 
-    println("Init successful, $deviceManager devices loaded, start polling")
+    println("Init successful, $deviceRepository devices loaded, start polling")
     bot.startPolling()
 }
 
-suspend fun runCommandOnDevice(command: String, device: String): String =
-    deviceManager.findDevice(device, command).fold(
-        onSuccess = { device ->
-            client.get("http://hubitat.local/apps/api/${MAKER_API_APP_ID}/devices/${device.id}/$command") {
-                parameter("access_token", MAKER_API_TOKEN)
-            }.status.description
-        },
-        onFailure = {
-            it.printStackTrace()
-            it.message.toString()
-        }
-    )
-
-suspend fun runCommandOnHsm(command: String): String {
-    return client.get("http://hubitat.local/apps/api/${MAKER_API_APP_ID}/hsm/$command") {
-        parameter("access_token", MAKER_API_TOKEN)
-    }.status.description
-}
-
-suspend fun updateHubs(): Result<String> {
-    val statusMap = mutableMapOf<String, HttpStatusCode>()
-
-    for (hub in hubs) {
-        try {
-            val response = client.get("http://${hub.ip}/management/firmwareUpdate") {
-                parameter("token", hub.managementToken)
-            }
-            statusMap[hub.label] = response.status
-        } catch (_: Exception) {
-            statusMap[hub.label] = HttpStatusCode.InternalServerError
-        }
-    }
-    val failures = statusMap.filterValues { it != HttpStatusCode.OK }
-    return if (failures.isEmpty()) {
-        Result.success("All hub updates initialized successfully.")
-    } else {
-        val failureMessages = failures.entries.joinToString("\n") { (name, status) ->
-            "Failed to update hub $name Status: $status"
-        }
-        val successMessages = statusMap.filterValues { it == HttpStatusCode.OK }
-            .entries.joinToString("\n") { (name, _) ->
-                "Successfully issued update request to hub $name"
-            }
-        Result.failure(Exception("$failureMessages\n$successMessages"))
-    }
-}
-
-private suspend fun initHubs(): List<Device.Hub> {
-    val hubs = deviceManager.findDevicesByType(Device.Hub::class.java)
-    for (hub in hubs) {
-        val json: Map<String, JsonElement> =
-            Json.parseToJsonElement(client.get("http://hubitat.local/apps/api/${MAKER_API_APP_ID}/devices/${hub.id}") {
-                parameter("access_token", MAKER_API_TOKEN)
-            }.body<String>()).jsonObject
-
-        val ip = (json["attributes"] as JsonArray).find {
-            it.jsonObject["name"]!!.jsonPrimitive.content.toString() == "localIP"
-        }!!.jsonObject["currentValue"]!!.jsonPrimitive.content.toString()
-        hub.ip = ip
-        hub.managementToken = client.get("http://${ip}/hub/advanced/getManagementToken").body()
-    }
-    return hubs
-}

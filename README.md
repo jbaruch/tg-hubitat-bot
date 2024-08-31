@@ -18,6 +18,7 @@
 * `/cancel_alerts` - Cancels all alerts in HSM.
 * `/update` - Updates all hubs for which Hub Information Drivers are exposed in the Maker API of `hubitat.local`.
 * `/reboot [Hub Information Driver v3 instance name to reboot]` - Reboots a specified hub.
+* `/refresh` - Refresh Devices from Hub
 
 ## Device Name Notations:
 You can refer to devices in several ways:

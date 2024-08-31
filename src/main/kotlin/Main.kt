@@ -19,6 +19,8 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.lang.System.getenv
+import com.github.kotlintelegrambot.logging.LogLevel
+
 
 
 private val BOT_TOKEN = getenv("BOT_TOKEN") ?: throw IllegalStateException("BOT_TOKEN not set")
@@ -34,15 +36,13 @@ private lateinit var deviceManager: DeviceManager
 fun main() {
 
     deviceManager = runBlocking {
-        DeviceManager(client.get("http://hubitat.local/apps/api/${MAKER_API_APP_ID}/devices") {
-            parameter("access_token", MAKER_API_TOKEN)
-        }.body())
+        DeviceManager(getDevicesJson())
     }
     hubs = runBlocking { initHubs() }
 
     val bot = bot {
         token = BOT_TOKEN
-
+        logLevel = LogLevel.Network.Basic
         suspend fun CommandHandlerEnvironment.parseCommandWithArgs(command: String) {
             (if (args.isEmpty()) {
                 "Specify what do you want to $command"
@@ -73,11 +73,19 @@ fun main() {
                     }
                 ))
             }
+            command("refresh") {
+                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Refresh finished, ${deviceManager.refreshDevices(getDevicesJson())} loaded")
+            }
         }
     }
+
     println("Init successful, $deviceManager devices loaded, start polling")
     bot.startPolling()
 }
+
+private suspend fun getDevicesJson(): String = client.get("http://hubitat.local/apps/api/${MAKER_API_APP_ID}/devices") {
+    parameter("access_token", MAKER_API_TOKEN)
+}.body()
 
 suspend fun runCommandOnDevice(command: String, device: String): String =
     deviceManager.findDevice(device, command).fold(

@@ -6,12 +6,10 @@ import kotlinx.serialization.json.Json
 class DeviceManager(deviceListJson: String) {
 
     private val deviceCache: MutableMap<String, Device> = mutableMapOf()
-    private val devices: List<Device>
+    private lateinit var devices: List<Device>
 
     init {
-        val format = Json { ignoreUnknownKeys = true }
-        devices = format.decodeFromString<List<Device>>(deviceListJson)
-        initializeCache(devices)
+        refreshDevices(deviceListJson)
     }
 
     private fun initializeCache(devices: List<Device>) {
@@ -70,5 +68,13 @@ class DeviceManager(deviceListJson: String) {
 
     override fun toString(): String {
         return devices.size.toString()
+    }
+
+    fun refreshDevices(deviceListJson: String): Int {
+        val format = Json { ignoreUnknownKeys = true }
+        devices = format.decodeFromString<List<Device>>(deviceListJson)
+        deviceCache.clear()
+        initializeCache(devices)
+        return devices.size
     }
 }

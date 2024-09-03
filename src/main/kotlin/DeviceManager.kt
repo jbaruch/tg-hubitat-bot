@@ -6,11 +6,10 @@ import kotlinx.serialization.json.Json
 class DeviceManager(deviceListJson: String) {
 
     private val deviceCache: MutableMap<String, Device> = mutableMapOf()
+    private lateinit var devices: List<Device>
 
     init {
-        val format = Json { ignoreUnknownKeys = true }
-        val devices = format.decodeFromString<List<Device>>(deviceListJson)
-        initializeCache(devices)
+        refreshDevices(deviceListJson)
     }
 
     private fun initializeCache(devices: List<Device>) {
@@ -53,7 +52,7 @@ class DeviceManager(deviceListJson: String) {
         val device = deviceCache[normalizedQuery]
 
         if (device != null) {
-            return if (device.SUPPORTED_OPS.contains(command)) {
+            return if (device.supportedOps.contains(command)) {
                 Result.success(device)
             } else {
                 Result.failure(IllegalArgumentException("Command '$command' is not supported by device '${device.label}'"))
@@ -152,5 +151,21 @@ class DeviceAbbreviator {
             if (char != word[i]) return false
         }
         return true
+    }
+
+    fun <T : Device> findDevicesByType(type: Class<T>): List<T> {
+        return devices.filterIsInstance(type)
+    }
+
+    override fun toString(): String {
+        return devices.size.toString()
+    }
+
+    fun refreshDevices(deviceListJson: String): Int {
+        val format = Json { ignoreUnknownKeys = true }
+        devices = format.decodeFromString<List<Device>>(deviceListJson)
+        deviceCache.clear()
+        initializeCache(devices)
+        return devices.size
     }
 }

@@ -25,9 +25,10 @@ class DeviceManager(deviceListJson: String) {
                 addToCache(nameWithoutLights, device)
             }
 
-            nameMatrix.addName(fullName)
+            val result = nameMatrix.addName(fullName)
+            result.getOrElse { println("WARNING Unable to add $fullName due to ${result.exceptionOrNull()}") }
         }
-        nameMatrix.abbreviateMatrix()
+        nameMatrix.abbreviate()
         for (device in devices) {
             val fullName = device.label.lowercase()
             val abbreviation = nameMatrix.getAbbreviation(fullName)
@@ -68,27 +69,32 @@ class DeviceAbbreviator {
     private val names: MutableMap<String, Int> = mutableMapOf()
     private val abbreviations: MutableList<String> = mutableListOf()
     private val previousAbbreviationLength: MutableList<Int> = mutableListOf()
+    private var closedForAdditions = false
 
-    fun addName(name: String) {
-        if (name in this.names) {
-            throw IllegalArgumentException("Name is already present: $name")
-        }
+    fun addName(name: String): Result<Unit> {
+        if (closedForAdditions) return Result.failure(IllegalStateException("Cannot add names after executing abbreviate"))
+        if (name in this.names) return Result.failure(IllegalArgumentException("Name is already present: $name"))
+
         val tokenizedName = name.split(' ').toMutableList()
         names[name] = this.tokenizedNames.size
         this.tokenizedNames.add(tokenizedName)
         this.abbreviations.add("")
         this.previousAbbreviationLength.add(0)
+
+        return Result.success(Unit)
     }
 
-    fun abbreviateMatrix() {
+    fun abbreviate() {
         while (appendNextTokensToAbbreviations()) {
             shortenAbbreviation()
             updateMinAbbrevLength()
         }
+        closedForAdditions = true
     }
 
     fun getAbbreviation(fullName: String): Result<String> {
-        val i = this.names[fullName] ?: return Result.failure(IllegalArgumentException("$fullName was never abbreviated"))
+        val i =
+            this.names[fullName] ?: return Result.failure(IllegalArgumentException("$fullName was never abbreviated"))
         return Result.success(this.abbreviations[i])
     }
 

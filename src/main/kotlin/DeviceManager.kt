@@ -122,8 +122,9 @@ class DeviceAbbreviator {
         uniqueAbbreviations.addAll(abbreviations)
 
         for ((i, abbreviation) in this.abbreviations.withIndex()) {
-            if (abbreviation in abbreviationCache) {
-                this.abbreviations[i] = abbreviationCache[abbreviation]!!
+            val cachedAbbreviation = abbreviationCache[abbreviation]
+            if (cachedAbbreviation != null) {
+                this.abbreviations[i] = cachedAbbreviation
                 continue
             }
             uniqueAbbreviations.remove(abbreviation)

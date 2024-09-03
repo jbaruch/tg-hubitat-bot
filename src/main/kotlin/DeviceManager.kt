@@ -86,7 +86,7 @@ class DeviceAbbreviator {
 
     fun abbreviate() {
         while (appendNextTokensToAbbreviations()) {
-            shortenAbbreviation()
+            shortenAbbreviations()
             updateMinAbbrevLength()
         }
         closedForAdditions = true
@@ -116,26 +116,27 @@ class DeviceAbbreviator {
         }
     }
 
-    private fun shortenAbbreviation() {
+    private fun shortenAbbreviations() {
         val uniqueAbbreviations = mutableSetOf<String>()
         val abbreviationCache = mutableMapOf<String, String>()
         uniqueAbbreviations.addAll(abbreviations)
 
         for ((i, abbreviation) in this.abbreviations.withIndex()) {
-            val cachedAbbreviation = abbreviationCache[abbreviation]
-            if (cachedAbbreviation != null) {
-                this.abbreviations[i] = cachedAbbreviation
-                continue
-            }
             uniqueAbbreviations.remove(abbreviation)
-            var newAbbreviation = abbreviation
-            for (stringEndIdx in previousAbbreviationLength[i] + 1..abbreviation.length) {
-                newAbbreviation = abbreviation.substring(0, stringEndIdx)
-                if (!isColliding(newAbbreviation, uniqueAbbreviations)) break
+            val cachedAbbreviation = abbreviationCache.computeIfAbsent(abbreviation){
+                findCollisionFreeAbbreviation(abbreviation, uniqueAbbreviations, previousAbbreviationLength[i] + 1)
             }
-            this.abbreviations[i] = newAbbreviation
+            this.abbreviations[i] = cachedAbbreviation
             uniqueAbbreviations.add(abbreviation)
         }
+    }
+    private fun findCollisionFreeAbbreviation(abbrev: String, otherAbbreviations: Set<String>, minLength: Int): String {
+        var newAbbreviation = abbrev
+        for (stringEndIdx in minLength..abbrev.length) {
+            newAbbreviation = abbrev.substring(0, stringEndIdx)
+            if (!isColliding(newAbbreviation, otherAbbreviations)) break
+        }
+        return newAbbreviation
     }
 
     private fun isColliding(abbrev: String, otherTokens: Iterable<String>): Boolean {

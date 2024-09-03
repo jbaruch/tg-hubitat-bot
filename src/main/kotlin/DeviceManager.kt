@@ -31,11 +31,8 @@ class DeviceManager(deviceListJson: String) {
         for (device in devices) {
             val fullName = device.label.lowercase()
             val abbreviation = nameMatrix.getAbbreviation(fullName)
-            if (abbreviation.isNullOrEmpty()) {
-                println("WARNING Device name was not abbreviated: $fullName")
-                continue
-            }
-            addToCache(abbreviation, device)
+            if (abbreviation.isSuccess) addToCache(abbreviation.getOrThrow(), device)
+            else println("WARNING Device name was not abbreviated: $fullName")
         }
     }
 
@@ -92,10 +89,9 @@ class DeviceAbbreviator {
         }
     }
 
-    fun getAbbreviation(fullName: String): String? {
-        if (fullName !in this.names) return null
-        val i = this.names[fullName] ?: return null
-        return this.abbreviations[i]
+    fun getAbbreviation(fullName: String): Result<String> {
+        val i = this.names[fullName] ?: return Result.failure(IllegalArgumentException("$fullName was never abbreviated"))
+        return Result.success(this.abbreviations[i])
     }
 
     private fun appendNextTokensToAbbreviations(): Boolean {

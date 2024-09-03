@@ -87,7 +87,7 @@ class DeviceAbbreviator {
     fun abbreviate() {
         while (appendNextTokensToAbbreviations()) {
             shortenAbbreviations()
-            updateMinAbbrevLength()
+            updatePrevAbbrevLength()
         }
         closedForAdditions = true
     }
@@ -110,7 +110,7 @@ class DeviceAbbreviator {
         return appended
     }
 
-    private fun updateMinAbbrevLength() {
+    private fun updatePrevAbbrevLength() {
         for ((i, abbreviation) in abbreviations.withIndex()) {
             previousAbbreviationLength[i] = abbreviation.length
         }

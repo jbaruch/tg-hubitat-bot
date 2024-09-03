@@ -68,7 +68,6 @@ class DeviceAbbreviator {
     private val names: MutableMap<String, Int> = mutableMapOf()
     private val abbreviations: MutableList<String> = mutableListOf()
     private val previousAbbreviationLength: MutableList<Int> = mutableListOf()
-    private var width: Int = 0
 
     fun addName(name: String) {
         if (name in this.names) {
@@ -79,7 +78,6 @@ class DeviceAbbreviator {
         this.tokenizedNames.add(tokenizedName)
         this.abbreviations.add("")
         this.previousAbbreviationLength.add(0)
-        this.width = maxOf(this.width, tokenizedNames.size)
     }
 
     fun abbreviateMatrix() {

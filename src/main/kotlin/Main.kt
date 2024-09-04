@@ -26,6 +26,7 @@ import com.github.kotlintelegrambot.logging.LogLevel
 private val BOT_TOKEN = getenv("BOT_TOKEN") ?: throw IllegalStateException("BOT_TOKEN not set")
 private val MAKER_API_APP_ID = getenv("MAKER_API_APP_ID") ?: throw IllegalStateException("MAKER_API_APP_ID not set")
 private val MAKER_API_TOKEN = getenv("MAKER_API_TOKEN") ?: throw IllegalStateException("MAKER_API_TOKEN not set")
+private val CHAT_ID = getenv("CHAT_ID") ?: ""
 
 private lateinit var hubs: List<Device.Hub>
 
@@ -74,12 +75,18 @@ fun main() {
                 ))
             }
             command("refresh") {
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Refresh finished, ${deviceManager.refreshDevices(getDevicesJson())} loaded")
+                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Refresh finished, ${deviceManager.refreshDevices(getDevicesJson())} devices loaded")
             }
         }
     }
 
     println("Init successful, $deviceManager devices loaded, start polling")
+    if(CHAT_ID != "") {
+        bot.sendMessage(
+            chatId = ChatId.fromId(CHAT_ID.toLong()),
+            text = "Init successful, $deviceManager devices loaded, start polling"
+        )
+    }
     bot.startPolling()
 }
 

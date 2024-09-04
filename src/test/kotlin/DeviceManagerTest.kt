@@ -18,7 +18,9 @@ class DeviceManagerTest {
                 {"id": 3, "label": "Bedroom Light", "type": "Room Lights Activator Switch"},
                 {"id": 4, "label": "Garage Door", "type": "Virtual Switch"},
                 {"id": 5, "label": "Baruch Office Light", "type": "Room Lights Activator Shade"},
-                {"id": 6, "label": "Master Bedroom Shades", "type": "Room Lights Activator Shade"}
+                {"id": 6, "label": "Master Bedroom Shades", "type": "Room Lights Activator Shade"},
+                {"id": 7, "label": "Master Bedroom Lights", "type": "Room Lights Activator Switch"},
+                {"id": 8, "label": "Master Bathroom Lights", "type": "Room Lights Activator Switch"}
             ]
         """.trimIndent()
 
@@ -87,6 +89,20 @@ class DeviceManagerTest {
         assertEquals("Command 'on' is not supported by device 'Master Bedroom Shades'", result.exceptionOrNull()?.message)
     }
 
+    @Test
+    fun `test conflicting abbreviation does not exist`() {
+        val result = deviceManager.findDevice("mbl", "on")
+        assertTrue(result.isFailure)
+        assertEquals("No device found for query: mbl", result.exceptionOrNull()?.message)
+    }
+
+    @Test
+    fun `test finding shortest possible abbreviation`() {
+        val result = deviceManager.findDevice("mbel", "on")
+        assertTrue(result.isSuccess)
+        assertEquals(7, result.getOrNull()?.id)
+    }
+    
     @Test
     fun `test finding devices by type`() {
         val bulbs = deviceManager.findDevicesByType(Device.RoomLightsActivatorBulb::class.java)

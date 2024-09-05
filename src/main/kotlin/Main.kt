@@ -75,7 +75,8 @@ fun main() {
                 ))
             }
             command("refresh") {
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Refresh finished, ${deviceManager.refreshDevices(getDevicesJson())} devices loaded")
+                val refreshResults = deviceManager.refreshDevices(getDevicesJson())
+                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Refresh finished, ${refreshResults.first} devices loaded. Warnings: ${refreshResults.second}")
             }
         }
     }

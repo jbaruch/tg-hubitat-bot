@@ -12,7 +12,24 @@ class DeviceManager(deviceListJson: String) {
         refreshDevices(deviceListJson)
     }
 
-    private fun initializeCache(devices: List<Device>) {
+    fun refreshDevices(deviceListJson: String): Pair<Int, List<String>> {
+        val format = Json { ignoreUnknownKeys = true }
+        devices = format.decodeFromString<List<Device>>(deviceListJson)
+        deviceCache.clear()
+        val result: Pair<Int,List<String>> = Pair(devices.size, initializeCache(devices))
+        return result
+    }
+
+    fun <T : Device> findDevicesByType(type: Class<T>): List<T> {
+        return devices.filterIsInstance(type)
+    }
+
+    override fun toString(): String {
+        return devices.size.toString()
+    }
+
+    private fun initializeCache(devices: List<Device>): List<String> {
+        val warnings: MutableList<String> = ArrayList()
         val nameMatrix = DeviceAbbreviator()
         for (device in devices) {
             val fullName = device.label.lowercase()
@@ -25,22 +42,36 @@ class DeviceManager(deviceListJson: String) {
             }
 
             val result = nameMatrix.addName(fullName)
-            result.getOrElse { println("WARNING Unable to add $fullName due to ${result.exceptionOrNull()}") }
+            result.getOrElse {
+                val message = "WARNING Unable to add $fullName due to ${result.exceptionOrNull()}"
+                warnings.add(message)
+                println(message)
+            }
         }
         nameMatrix.abbreviate()
         for (device in devices) {
             val fullName = device.label.lowercase()
             val abbreviation = nameMatrix.getAbbreviation(fullName)
-            if (abbreviation.isSuccess) addToCache(abbreviation.getOrThrow(), device)
-            else println("WARNING Device name was not abbreviated: $fullName")
+            if (abbreviation.isSuccess) {
+                warnings.addAll(addToCache(abbreviation.getOrThrow(), device))
+            } else {
+                val message = "WARNING Device name was not abbreviated: $fullName"
+                warnings.add(message)
+                println(message)
+            }
         }
+        return warnings
     }
 
-    private fun addToCache(key: String, device: Device) {
+    private fun addToCache(key: String, device: Device):List<String> {
+        var warnings: MutableList<String> = ArrayList()
         if (deviceCache.containsKey(key)) {
-            println("WARNING Duplicate key found in cache: $key")
+            val message = "WARNING Duplicate key found in cache: $key"
+            warnings.add(message)
+            println(message)
         }
         deviceCache[key] = device
+        return warnings
     }
 
     private fun removeLightSuffix(name: String): String {
@@ -129,6 +160,7 @@ class DeviceAbbreviator {
             uniqueAbbreviations.add(abbreviation)
         }
     }
+
     private fun findCollisionFreeAbbreviation(abbrev: String, otherAbbreviations: Set<String>, minLength: Int): String {
         var newAbbreviation = abbrev
         for (stringEndIdx in minLength..abbrev.length) {
@@ -153,19 +185,4 @@ class DeviceAbbreviator {
         return true
     }
 
-    fun <T : Device> findDevicesByType(type: Class<T>): List<T> {
-        return devices.filterIsInstance(type)
-    }
-
-    override fun toString(): String {
-        return devices.size.toString()
-    }
-
-    fun refreshDevices(deviceListJson: String): Int {
-        val format = Json { ignoreUnknownKeys = true }
-        devices = format.decodeFromString<List<Device>>(deviceListJson)
-        deviceCache.clear()
-        initializeCache(devices)
-        return devices.size
-    }
 }

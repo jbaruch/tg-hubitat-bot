@@ -39,9 +39,11 @@ jib {
     }
     container {
         environment = mapOf(
-            "HUBITAT_TOKEN" to (project.findProperty("HUBITAT_TOKEN") ?: "") as String,
             "BOT_TOKEN" to (project.findProperty("BOT_TOKEN") ?: "") as String,
-            "BOT_TOKEN" to (project.findProperty("BOT_TOKEN") ?: "") as String
+            "MAKER_API_TOKEN" to (project.findProperty("MAKER_API_TOKEN") ?: "") as String,
+            "MAKER_API_APP_ID" to (project.findProperty("MAKER_API_APP_ID") ?: "") as String,
+            "CHAT_ID" to (project.findProperty("CHAT_ID") ?: "") as String,
+            "DEFAULT_HUB_IP" to (project.findProperty("DEFAULT_HUB_IP") ?: "") as String
         )
     }
 }

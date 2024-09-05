@@ -27,6 +27,7 @@ private val BOT_TOKEN = getenv("BOT_TOKEN") ?: throw IllegalStateException("BOT_
 private val MAKER_API_APP_ID = getenv("MAKER_API_APP_ID") ?: throw IllegalStateException("MAKER_API_APP_ID not set")
 private val MAKER_API_TOKEN = getenv("MAKER_API_TOKEN") ?: throw IllegalStateException("MAKER_API_TOKEN not set")
 private val CHAT_ID = getenv("CHAT_ID") ?: ""
+private val DEFAULT_HUB_IP = getenv("DEFAULT_HUB_IP") ?: "hubitat.local"
 
 private lateinit var hubs: List<Device.Hub>
 
@@ -91,14 +92,14 @@ fun main() {
     bot.startPolling()
 }
 
-private suspend fun getDevicesJson(): String = client.get("http://hubitat.local/apps/api/${MAKER_API_APP_ID}/devices") {
+private suspend fun getDevicesJson(): String = client.get("http://${DEFAULT_HUB_IP}/apps/api/${MAKER_API_APP_ID}/devices") {
     parameter("access_token", MAKER_API_TOKEN)
 }.body()
 
 suspend fun runCommandOnDevice(command: String, device: String): String =
     deviceManager.findDevice(device, command).fold(
         onSuccess = { device ->
-            client.get("http://hubitat.local/apps/api/${MAKER_API_APP_ID}/devices/${device.id}/$command") {
+            client.get("http://${DEFAULT_HUB_IP}/apps/api/${MAKER_API_APP_ID}/devices/${device.id}/$command") {
                 parameter("access_token", MAKER_API_TOKEN)
             }.status.description
         },
@@ -109,7 +110,7 @@ suspend fun runCommandOnDevice(command: String, device: String): String =
     )
 
 suspend fun runCommandOnHsm(command: String): String {
-    return client.get("http://hubitat.local/apps/api/${MAKER_API_APP_ID}/hsm/$command") {
+    return client.get("http://${DEFAULT_HUB_IP}/apps/api/${MAKER_API_APP_ID}/hsm/$command") {
         parameter("access_token", MAKER_API_TOKEN)
     }.status.description
 }
@@ -146,7 +147,7 @@ private suspend fun initHubs(): List<Device.Hub> {
     val hubs = deviceManager.findDevicesByType(Device.Hub::class.java)
     for (hub in hubs) {
         val json: Map<String, JsonElement> =
-            Json.parseToJsonElement(client.get("http://hubitat.local/apps/api/${MAKER_API_APP_ID}/devices/${hub.id}") {
+            Json.parseToJsonElement(client.get("http://${DEFAULT_HUB_IP}/apps/api/${MAKER_API_APP_ID}/devices/${hub.id}") {
                 parameter("access_token", MAKER_API_TOKEN)
             }.body<String>()).jsonObject
 

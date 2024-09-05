@@ -1,8 +1,10 @@
 # Telegram Bot for Hubitat Elevation
 
 ## Quick Start
-1. Set up Maker API on `hubitat.local`.
-2. Configure environment variables: `MAKER_API_APP_ID`, `MAKER_API_TOKEN`, `BOT_TOKEN`.
+1. Set up Maker API on `hubitat.local` or use `DEFAULT_HUB_IP` environment varialbe to specify the IP of your primary hub.
+2. Configure mandatory environment variables: `MAKER_API_APP_ID`, `MAKER_API_TOKEN`, `BOT_TOKEN`.
+   * If you know the ID of your DM chat with your bot, you can add it as `CHAT_ID` variable.
+   * If your primary hub is not using `hubitat.local` DNS entry, use `DEFAULT_HUB_IP` to specify the ip.
 3. Deploy the Docker container.
 4. Start sending commands to your bot!
 
@@ -44,10 +46,16 @@ You can refer to devices in several ways:
 6. Create a bot in Telegram using BotFather bot.
 7. Add the commands using `setcommands` in BotFather.
 8. Configure environment variables:
-* `MAKER_API_APP_ID` - The Maker API app ID.
-* `MAKER_API_TOKEN` - The Maker API token.
-* `BOT_TOKEN` - The Telegram bot token.
-8. Deploy the Docker image:
+   * Mandatory:
+     * `MAKER_API_APP_ID` - The Maker API app ID.
+     * `MAKER_API_TOKEN` - The Maker API token.
+     * `BOT_TOKEN` - The Telegram bot token.
+   * Optional:
+     * `CHAT_ID` - The ID of your DM chat with the Bot (or other chat the bot is added to).
+     If you use that variable, the bot will be able to proactively send information to the chat. If you don't use it, it will only reply to your messages.
+     There are number of ways to find this ID, some of them are listed [here](https://stackoverflow.com/questions/32423837/telegram-bot-how-to-get-a-group-chat-id).
+     * `DEFAULT_HUB_IP` – The IP of the hub the Maker API app is installed on. Defaults to DNS hostname of `hubitat.local`. 
+9. Deploy the Docker image:
   - Load the Docker image: `docker load < tg-hubitat-bot-docker-image.tar`
   - Create and run the container: `docker run -d --name tg-hubitat-bot -e MAKER_API_APP_ID -e MAKER_API_TOKEN -e BOT_TOKEN tg-hubitat-bot`
 

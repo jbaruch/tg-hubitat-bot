@@ -20,8 +20,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.lang.System.getenv
 import com.github.kotlintelegrambot.logging.LogLevel
-
-
+import com.github.kotlintelegrambot.entities.ParseMode.MARKDOWN_V2
 
 private val BOT_TOKEN = getenv("BOT_TOKEN") ?: throw IllegalStateException("BOT_TOKEN not set")
 private val MAKER_API_APP_ID = getenv("MAKER_API_APP_ID") ?: throw IllegalStateException("MAKER_API_APP_ID not set")
@@ -78,6 +77,9 @@ fun main() {
             command("refresh") {
                 val refreshResults = deviceManager.refreshDevices(getDevicesJson())
                 bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Refresh finished, ${refreshResults.first} devices loaded. Warnings: ${refreshResults.second}")
+            }
+            command("list") {
+                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = deviceManager.list(), parseMode = MARKDOWN_V2)
             }
         }
     }

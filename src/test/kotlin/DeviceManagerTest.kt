@@ -20,7 +20,8 @@ class DeviceManagerTest {
                 {"id": 5, "label": "Baruch Office Light", "type": "Room Lights Activator Shade"},
                 {"id": 6, "label": "Master Bedroom Shades", "type": "Room Lights Activator Shade"},
                 {"id": 7, "label": "Master Bedroom Lights", "type": "Room Lights Activator Switch"},
-                {"id": 8, "label": "Master Bathroom Lights", "type": "Room Lights Activator Switch"}
+                {"id": 8, "label": "Master Bathroom Lights", "type": "Room Lights Activator Switch"},
+                {"id": 9, "label": "Guest Bedroom Lights", "type": "Room Lights Activator Switch"}
             ]
         """.trimIndent()
 
@@ -98,9 +99,13 @@ class DeviceManagerTest {
 
     @Test
     fun `test finding shortest possible abbreviation`() {
-        val result = deviceManager.findDevice("mbel", "on")
-        assertTrue(result.isSuccess)
-        assertEquals(7, result.getOrNull()?.id)
+        val masterBedroomLights = deviceManager.findDevice("mbel", "on")
+        assertTrue(masterBedroomLights.isSuccess)
+        assertEquals(7, masterBedroomLights.getOrNull()?.id)
+
+        val guestBedroomLights = deviceManager.findDevice("gbl", command = "on")
+        assertTrue(guestBedroomLights.isSuccess)
+        assertEquals(9, guestBedroomLights.getOrNull()?.id)
     }
     
     @Test

@@ -31,7 +31,7 @@ You can refer to devices in several ways:
   - Example: `/off Kitchen`
 * **Abbreviation:** Use the first letters of each word in the full name.
   - Example: `/on kl`
-  - **TODO (Currently not supported): Abbreviation conflicts** can be resolved by specifying the first non-conflicting letter in the first non-conflicting word of the name:
+  - **Abbreviation conflicts** can be resolved by specifying the first non-conflicting letter in the first non-conflicting word of the name:
     * Let's assume you have three conflicting devices, `Main Bedroom Lights`, `Main Backyard Lights`, and `Main Bathroom Lights`. All three are abbreviated to `mbl`, which creates a conflict.
     * Use `mbel` for `Main Bedroom Lights` as `e` in the second word (Bedroom) is the first unique letter, distinguishing it from `Main Backyard Lights` and `Main Bathroom Lights`.
     * Use `mbacl` for `Main Backyard Lights` as `c` in the second word (Backyard) is the first unique letter, distinguishing it from `Main Bathroom Lights`. Using `mbal` won't be enough, as it is still the same for both `Main Bathroom Lights` and `Main Backyard Lights`.

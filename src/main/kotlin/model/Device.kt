@@ -16,6 +16,11 @@ sealed class Device {
     }
 
     @Serializable
+    sealed class Button() : Device() {
+        override val supportedOps: List<String> = listOf("doubleTap", "hold", "push", "release")
+    }
+
+    @Serializable
     sealed class Shade() : Device() {
         override val supportedOps: List<String> = listOf("open", "close")
     }
@@ -29,6 +34,10 @@ sealed class Device {
     @Serializable
     @SerialName("Virtual Switch")
     data class VirtualSwitch (override val id: Int, override val label: String) : Actuator()
+
+    @Serializable
+    @SerialName("Virtual Button")
+    data class VirtualButton (override val id: Int, override val label: String) : Button()
 
     @Serializable
     @SerialName("Room Lights Activator Switch")

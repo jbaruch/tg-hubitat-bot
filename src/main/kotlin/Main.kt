@@ -1,10 +1,12 @@
 package jbaru.ch.telegram.hubitat
 
+import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.bot
 import com.github.kotlintelegrambot.dispatch
 import com.github.kotlintelegrambot.dispatcher.command
-import com.github.kotlintelegrambot.dispatcher.handlers.CommandHandlerEnvironment
+import com.github.kotlintelegrambot.dispatcher.message
 import com.github.kotlintelegrambot.entities.ChatId
+import com.github.kotlintelegrambot.entities.Message
 import io.ktor.client.*
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.*
@@ -21,7 +23,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.lang.System.getenv
 import com.github.kotlintelegrambot.logging.LogLevel
 import com.github.kotlintelegrambot.entities.ParseMode.MARKDOWN_V2
-import java.util.concurrent.TimeUnit
+import com.github.kotlintelegrambot.extensions.filters.Filter
+import java.util.Locale
 
 private val BOT_TOKEN = getenv("BOT_TOKEN") ?: throw IllegalStateException("BOT_TOKEN not set")
 private val MAKER_API_APP_ID = getenv("MAKER_API_APP_ID") ?: throw IllegalStateException("MAKER_API_APP_ID not set")
@@ -45,27 +48,16 @@ fun main() {
     val bot = bot {
         token = BOT_TOKEN
         logLevel = LogLevel.Network.Basic
-        suspend fun CommandHandlerEnvironment.parseCommandWithArgs(command: String) {
-            (if (args.isEmpty()) {
-                "Specify what do you want to $command"
-            } else {
-                runCommandOnDevice(command, args.joinToString(" "))
-            }).also {
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = it)
-            }
-        }
 
         dispatch {
-            command("on") { parseCommandWithArgs("on") }
-            command("off") { parseCommandWithArgs("off") }
-            command("open") { parseCommandWithArgs("open") }
-            command("close") { parseCommandWithArgs("close") }
-            command("reboot") {parseCommandWithArgs("reboot") }
+
+            message(DeviceCommandFilter()) {
+                handleDeviceCommand(bot, message)
+            }
 
             command("cancel_alerts") {
                 bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = runCommandOnHsm("cancelAlerts"))
             }
-
             command("update") {
                 bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = updateHubs().fold(
                     onSuccess = { it },
@@ -83,12 +75,17 @@ fun main() {
                 bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = deviceManager.list(), parseMode = MARKDOWN_V2)
             }
             command("shutdown_restart") {
-                parseCommandWithArgs("shutdown")
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Shutting down, please wait for graceful shutdown.")
-                TimeUnit.MINUTES.sleep(1)
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Cutting power, please wait for radios reset.")
-                TimeUnit.MINUTES.sleep(1)
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Restarting hub.")
+                //find hubs with z-wave on and iterate on  them
+
+                //var zWaveHubs =  deviceManager.findZWaveEnabledHubs()
+                //zWaveHubs.foreach{
+    //                runDeviceCommand(it, "shutdown")
+    //                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Shutting down, please wait for graceful shutdown.")
+    //                TimeUnit.MINUTES.sleep(1)
+    //                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Cutting power, please wait for radios reset.")
+    //                TimeUnit.MINUTES.sleep(1)
+    //                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Restarting hub.")
+                //}
             }
         }
     }
@@ -103,22 +100,61 @@ fun main() {
     bot.startPolling()
 }
 
+fun String.snakeToCamelCase(): String {
+    return split("_").mapIndexed { index, s ->
+        if (index == 0) s else replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+    }.joinToString("")
+}
+
 private suspend fun getDevicesJson(): String = client.get("http://${DEFAULT_HUB_IP}/apps/api/${MAKER_API_APP_ID}/devices") {
     parameter("access_token", MAKER_API_TOKEN)
 }.body()
 
-suspend fun runCommandOnDevice(command: String, device: String): String =
-    deviceManager.findDevice(device, command).fold(
+
+suspend fun handleDeviceCommand(bot: Bot, message: Message) {
+    val parts = message.text?.split(" ") ?: return
+    if (parts.size < 2) {
+        bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Please specify a device name for the command.")
+        return
+    }
+
+    val snakeCaseCommand = parts[0].removePrefix("/")
+    val camelCaseCommand = snakeCaseCommand.snakeToCamelCase()
+    val deviceName = parts[1]
+    val args = parts.drop(2)
+
+    val result = deviceManager.findDevice(deviceName, camelCaseCommand).fold(
         onSuccess = { device ->
-            client.get("http://${DEFAULT_HUB_IP}/apps/api/${MAKER_API_APP_ID}/devices/${device.id}/$command") {
-                parameter("access_token", MAKER_API_TOKEN)
-            }.status.description
+            val argCount = device.supportedOps[camelCaseCommand]
+            if (argCount == null) {
+                "Command '/$snakeCaseCommand' is not supported by device '${device.label}'"
+            } else if (args.size != argCount) {
+                "Invalid number of arguments for /$snakeCaseCommand. Expected $argCount argument(s)."
+            } else {
+                runDeviceCommand(device, camelCaseCommand, args)
+            }
         },
         onFailure = {
             it.printStackTrace()
             it.message.toString()
         }
     )
+
+    bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = result)
+}
+
+suspend fun runDeviceCommand(device: Device, command: String, args: List<String>): String {
+    val commandPath = buildString {
+        append("/apps/api/${MAKER_API_APP_ID}/devices/${device.id}/$command")
+        if (args.isNotEmpty()) {
+            append("/${args.joinToString("/")}")
+        }
+    }
+
+    return client.get("http://${DEFAULT_HUB_IP}$commandPath") {
+        parameter("access_token", MAKER_API_TOKEN)
+    }.status.description
+}
 
 suspend fun runCommandOnHsm(command: String): String {
     return client.get("http://${DEFAULT_HUB_IP}/apps/api/${MAKER_API_APP_ID}/hsm/$command") {
@@ -169,4 +205,12 @@ private suspend fun initHubs(): List<Device.Hub> {
         hub.managementToken = client.get("http://${ip}/hub/advanced/getManagementToken").body()
     }
     return hubs
+}
+
+
+class DeviceCommandFilter : Filter {
+    override fun Message.predicate(): Boolean {
+        val command = text?.split(" ")?.firstOrNull()?.removePrefix("/")
+        return command != null && deviceManager.isDeviceCommand(command.snakeToCamelCase())
+    }
 }

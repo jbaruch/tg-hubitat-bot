@@ -7,9 +7,12 @@ class DeviceManager(deviceListJson: String) {
 
     private val deviceCache: MutableMap<String, Device> = mutableMapOf()
     private lateinit var devices: List<Device>
+    private val allDeviceCommands: Set<String>
+
 
     init {
         refreshDevices(deviceListJson)
+        allDeviceCommands = devices.flatMap { it.supportedOps.keys }.toSet()
     }
 
     fun refreshDevices(deviceListJson: String): Pair<Int, List<String>> {
@@ -18,6 +21,25 @@ class DeviceManager(deviceListJson: String) {
         deviceCache.clear()
         val result: Pair<Int,List<String>> = Pair(devices.size, initializeCache(devices))
         return result
+    }
+
+    fun isDeviceCommand(command: String): Boolean {
+        return command in allDeviceCommands
+    }
+
+    fun findDevice(name: String, command: String): Result<Device> {
+        val normalizedQuery = name.lowercase()
+        val device = deviceCache[normalizedQuery]
+
+        if (device != null) {
+            return if (device.supportedOps.containsKey(command)) {
+                Result.success(device)
+            } else {
+                Result.failure(IllegalArgumentException("Command '$command' is not supported by device '${device.label}'"))
+            }
+        }
+
+        return Result.failure(Exception("No device found for query: $name"))
     }
 
     fun <T : Device> findDevicesByType(type: Class<T>): List<T> {
@@ -105,20 +127,5 @@ class DeviceManager(deviceListJson: String) {
 
     private fun removeLightSuffix(name: String): String {
         return name.replace(Regex(" lights?$", RegexOption.IGNORE_CASE), "").trim()
-    }
-
-    fun findDevice(name: String, command: String): Result<Device> {
-        val normalizedQuery = name.lowercase()
-        val device = deviceCache[normalizedQuery]
-
-        if (device != null) {
-            return if (device.supportedOps.contains(command)) {
-                Result.success(device)
-            } else {
-                Result.failure(IllegalArgumentException("Command '$command' is not supported by device '${device.label}'"))
-            }
-        }
-
-        return Result.failure(Exception("No device found for query: $name"))
     }
 }

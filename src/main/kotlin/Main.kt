@@ -24,7 +24,6 @@ import java.lang.System.getenv
 import com.github.kotlintelegrambot.logging.LogLevel
 import com.github.kotlintelegrambot.entities.ParseMode.MARKDOWN_V2
 import com.github.kotlintelegrambot.extensions.filters.Filter
-import java.util.Locale
 
 private val BOT_TOKEN = getenv("BOT_TOKEN") ?: throw IllegalStateException("BOT_TOKEN not set")
 private val MAKER_API_APP_ID = getenv("MAKER_API_APP_ID") ?: throw IllegalStateException("MAKER_API_APP_ID not set")
@@ -102,7 +101,7 @@ fun main() {
 
 fun String.snakeToCamelCase(): String {
     return split("_").mapIndexed { index, s ->
-        if (index == 0) s else replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+        if (index == 0) s else s.replaceFirstChar(Char::titlecase)
     }.joinToString("")
 }
 

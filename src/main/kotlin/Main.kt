@@ -21,6 +21,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.lang.System.getenv
 import com.github.kotlintelegrambot.logging.LogLevel
 import com.github.kotlintelegrambot.entities.ParseMode.MARKDOWN_V2
+import java.util.concurrent.TimeUnit
 
 private val BOT_TOKEN = getenv("BOT_TOKEN") ?: throw IllegalStateException("BOT_TOKEN not set")
 private val MAKER_API_APP_ID = getenv("MAKER_API_APP_ID") ?: throw IllegalStateException("MAKER_API_APP_ID not set")
@@ -80,6 +81,14 @@ fun main() {
             }
             command("list") {
                 bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = deviceManager.list(), parseMode = MARKDOWN_V2)
+            }
+            command("shutdown_restart") {
+                parseCommandWithArgs("shutdown")
+                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Shutting down, please wait for graceful shutdown.")
+                TimeUnit.MINUTES.sleep(1)
+                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Cutting power, please wait for radios reset.")
+                TimeUnit.MINUTES.sleep(1)
+                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Restarting hub.")
             }
         }
     }

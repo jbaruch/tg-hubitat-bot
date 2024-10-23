@@ -3,8 +3,8 @@
 ## Quick Start
 1. Set up Maker API on `hubitat.local` or use `DEFAULT_HUB_IP` environment variable to specify the IP of your primary hub.
 2. Configure mandatory environment variables: `MAKER_API_APP_ID`, `MAKER_API_TOKEN`, `BOT_TOKEN`.
-   * If you know the ID of your DM chat with your bot, you can add it as `CHAT_ID` variable.
-   * If your primary hub is not using `hubitat.local` DNS entry, use `DEFAULT_HUB_IP` to specify the ip.
+  * If you know the ID of your DM chat with your bot, you can add it as `CHAT_ID` variable.
+  * If your primary hub is not using `hubitat.local` DNS entry, use `DEFAULT_HUB_IP` to specify the ip.
 3. Deploy the Docker container.
 4. Start sending commands to your bot!
 
@@ -21,11 +21,13 @@
   * `/push [device name]` - Executes a push action on a button device.
   * `/hold [device name]` - Executes a hold action on a button device.
   * `/release [device name]` - Executes a release action on a button device.
+  * `/get_open_sensors` - Lists all sensors that are currently open.
 
 * System Commands:
   * `/cancel_alerts` - Cancels all alerts in HSM.
   * `/update` - Updates all hubs for which Hub Information Drivers are exposed in the Maker API of `hubitat.local`.
   * `/reboot [Hub Information Driver v3 instance name]` - Reboots a specified hub.
+
 
 ## Device Name Notations:
 You can refer to devices in several ways:
@@ -48,32 +50,31 @@ You can refer to devices in several ways:
 4. Expose all needed devices in Maker API (including devices from other hubs via mesh).
 5. Ensure Hub Information Driver v3 is installed on every hub (via Hubitat Package Manager) and exposed in Maker API on `hubitat.local` (directly and via mesh).
 6. Create a bot in Telegram using BotFather bot.
-7. Configure environment variables:
-   * Mandatory:
-     * `MAKER_API_APP_ID` - The Maker API app ID.
-     * `MAKER_API_TOKEN` - The Maker API token.
-     * `BOT_TOKEN` - The Telegram bot token.
-   * Optional:
-     * `CHAT_ID` - The ID of your DM chat with the Bot (or other chat the bot is added to).
-       If you use that variable, the bot will be able to proactively send information to the chat. If you don't use it, it will only reply to your messages.
-       There are number of ways to find this ID, some of them are listed [here](https://stackoverflow.com/questions/32423837/telegram-bot-how-to-get-a-group-chat-id).
-     * `DEFAULT_HUB_IP` – The IP of the hub the Maker API app is installed on. Defaults to DNS hostname of `hubitat.local`.
-8. Deploy the Docker image:
-- Load the Docker image: `docker load < tg-hubitat-bot-docker-image.tar`
-- Create and run the container: `docker run -d --name tg-hubitat-bot -e MAKER_API_APP_ID -e MAKER_API_TOKEN -e BOT_TOKEN tg-hubitat-bot`
+7. (Optional) create commands in the bot using BotFather's `/setcommands` command. This is optional as you can send arbitrary commands by text without completion in the bot. 
+8. Configure environment variables:
+  * Mandatory:
+    * `MAKER_API_APP_ID` - The Maker API app ID.
+    * `MAKER_API_TOKEN` - The Maker API token.
+    * `BOT_TOKEN` - The Telegram bot token.
+  * Optional:
+    * `CHAT_ID` - The ID of your DM chat with the Bot (or other chat the bot is added to).
+      If you use that variable, the bot will be able to proactively send information to the chat. If you don't use it, it will only reply to your messages.
+      There are number of ways to find this ID, some of them are listed [here](https://stackoverflow.com/questions/32423837/telegram-bot-how-to-get-a-group-chat-id).
+    * `DEFAULT_HUB_IP` – The IP of the hub the Maker API app is installed on. Defaults to DNS hostname of `hubitat.local`.
+9. Deploy the Docker image:
+   - Load the Docker image: `docker load < tg-hubitat-bot-docker-image.tar`
+   - Create and run the container: `docker run -d --name tg-hubitat-bot -e MAKER_API_APP_ID -e MAKER_API_TOKEN -e BOT_TOKEN tg-hubitat-bot`
 
 ## Adding New Device Types:
 To add support for new device types:
 1. Update the `Device` sealed class in `Device.kt` to include the new device type.
 2. Add the appropriate `supportedOps` for the new device type.
-3. If necessary, update the `DeviceManager` to handle any special cases for the new device type.
+3. Define the appropriate `attributes` for the new device type.
+4. If necessary, update the `DeviceManager` to handle any special cases for the new device type, including how to query and interpret the new attributes.
+5. Test the new device type to ensure that all operations and attribute queries work as expected.
 
-## Building:
-* `./gradlew build` - Build the project.
-* `./gradlew jibDockerBuild` - Build a Docker container.
-* `./gradlew jibBuildTar` - Create a portable tar of the container.
+### Build the project
+1. Build the project using `./gradlew build`.
+2. Create the Docker image using `./gradlew jibDockerBuild`
+3. (Optional) Export the image to tar file using `./gradlew jibBuildTar`
 
-## Additional Resources
-* [Hubitat Maker API Documentation](https://docs.hubitat.com/index.php?title=Maker_API)
-* [Telegram BotFather](https://core.telegram.org/bots#botfather)
-* [Hubitat Community Forums](https://community.hubitat.com/)

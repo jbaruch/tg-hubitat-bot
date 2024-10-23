@@ -24,6 +24,8 @@ import java.lang.System.getenv
 import com.github.kotlintelegrambot.logging.LogLevel
 import com.github.kotlintelegrambot.entities.ParseMode.MARKDOWN_V2
 import com.github.kotlintelegrambot.extensions.filters.Filter
+import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
 
 private val BOT_TOKEN = getenv("BOT_TOKEN") ?: throw IllegalStateException("BOT_TOKEN not set")
 private val MAKER_API_APP_ID = getenv("MAKER_API_APP_ID") ?: throw IllegalStateException("MAKER_API_APP_ID not set")
@@ -68,29 +70,55 @@ fun main() {
             }
             command("refresh") {
                 val refreshResults = deviceManager.refreshDevices(getDevicesJson())
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Refresh finished, ${refreshResults.first} devices loaded. Warnings: ${refreshResults.second}")
+                bot.sendMessage(
+                    chatId = ChatId.fromId(message.chat.id),
+                    text = "Refresh finished, ${refreshResults.first} devices loaded. Warnings: ${refreshResults.second}"
+                )
             }
             command("list") {
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = deviceManager.list(), parseMode = MARKDOWN_V2)
+                bot.sendMessage(
+                    chatId = ChatId.fromId(message.chat.id),
+                    text = deviceManager.list(),
+                    parseMode = MARKDOWN_V2
+                )
             }
             command("shutdown_restart") {
                 //find hubs with z-wave on and iterate on  them
 
                 //var zWaveHubs =  deviceManager.findZWaveEnabledHubs()
                 //zWaveHubs.foreach{
-    //                runDeviceCommand(it, "shutdown")
-    //                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Shutting down, please wait for graceful shutdown.")
-    //                TimeUnit.MINUTES.sleep(1)
-    //                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Cutting power, please wait for radios reset.")
-    //                TimeUnit.MINUTES.sleep(1)
-    //                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Restarting hub.")
+                //                runDeviceCommand(it, "shutdown")
+                //                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Shutting down, please wait for graceful shutdown.")
+                //                TimeUnit.MINUTES.sleep(1)
+                //                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Cutting power, please wait for radios reset.")
+                //                TimeUnit.MINUTES.sleep(1)
+                //                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Restarting hub.")
                 //}
+            }
+            command("get_open_sensors") {
+                val openSensors = deviceManager.findDevicesByType(Device.ContactSensor::class.java)
+                    .mapNotNull { sensor ->
+                        val currentValue = getDeviceAttribute(sensor, "contact")
+                        if (currentValue == "open") {
+                            sensor.label
+                        } else {
+                            null
+                        }
+                    }.joinToString(separator = "\n")
+
+                val response = if (openSensors.isNotEmpty()) {
+                    "Open Sensors:\n$openSensors"
+                } else {
+                    "No open sensors found."
+                }
+
+                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = response)
             }
         }
     }
 
     println("Init successful, $deviceManager devices loaded, start polling")
-    if(CHAT_ID != "") {
+    if (CHAT_ID != "") {
         bot.sendMessage(
             chatId = ChatId.fromId(CHAT_ID.toLong()),
             text = "Init successful, $deviceManager devices loaded, start polling"
@@ -105,9 +133,10 @@ fun String.snakeToCamelCase(): String {
     }.joinToString("")
 }
 
-private suspend fun getDevicesJson(): String = client.get("http://${DEFAULT_HUB_IP}/apps/api/${MAKER_API_APP_ID}/devices") {
-    parameter("access_token", MAKER_API_TOKEN)
-}.body()
+private suspend fun getDevicesJson(): String =
+    client.get("http://${DEFAULT_HUB_IP}/apps/api/${MAKER_API_APP_ID}/devices") {
+        parameter("access_token", MAKER_API_TOKEN)
+    }.body()
 
 
 suspend fun handleDeviceCommand(bot: Bot, message: Message) {
@@ -142,18 +171,33 @@ suspend fun handleDeviceCommand(bot: Bot, message: Message) {
     bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = result)
 }
 
-suspend fun runDeviceCommand(device: Device, command: String, args: List<String>): String {
-    val commandPath = buildString {
-        append("/apps/api/${MAKER_API_APP_ID}/devices/${device.id}/$command")
+
+suspend fun runDeviceQuery(device: Device, path: String, args: List<String> = emptyList()): HttpResponse {
+    val fullPath = buildString {
+        append("/apps/api/${MAKER_API_APP_ID}/devices/${device.id}/$path")
         if (args.isNotEmpty()) {
             append("/${args.joinToString("/")}")
         }
     }
 
-    return client.get("http://${DEFAULT_HUB_IP}$commandPath") {
+    return client.get("http://${DEFAULT_HUB_IP}$fullPath") {
         parameter("access_token", MAKER_API_TOKEN)
-    }.status.description
+    }
 }
+
+suspend fun runDeviceCommand(device: Device, command: String, args: List<String>): String {
+    val response = runDeviceQuery(device, command, args)
+    return response.status.description
+}
+
+suspend fun getDeviceAttribute(device: Device, attribute: String): String {
+    val response = runDeviceQuery(device, "attribute/$attribute")
+    val body = response.bodyAsText()
+    val json = Json.parseToJsonElement(body).jsonObject
+    return json["value"]?.jsonPrimitive?.content ?: "Unknown"
+}
+
+
 
 suspend fun runCommandOnHsm(command: String): String {
     return client.get("http://${DEFAULT_HUB_IP}/apps/api/${MAKER_API_APP_ID}/hsm/$command") {

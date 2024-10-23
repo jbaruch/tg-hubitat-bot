@@ -1,7 +1,6 @@
 @file:Suppress("unused")
 
 package jbaru.ch.telegram.hubitat.model
-import io.ktor.util.Attributes
 import kotlinx.serialization.*
 
 @Serializable

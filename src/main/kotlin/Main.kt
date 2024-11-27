@@ -76,25 +76,16 @@ fun main() {
                 )
             }
             command("list") {
-                bot.sendMessage(
-                    chatId = ChatId.fromId(message.chat.id),
-                    text = deviceManager.list(),
-                    parseMode = MARKDOWN_V2
-                )
+                val chatId = ChatId.fromId(message.chat.id)
+                deviceManager.listByType().forEach { (type, table) ->
+                    bot.sendMessage(
+                        chatId = chatId,
+                        text = "*$type*:\n$table",
+                        parseMode = MARKDOWN_V2
+                    )
+                }
             }
-            command("shutdown_restart") {
-                //find hubs with z-wave on and iterate on  them
 
-                //var zWaveHubs =  deviceManager.findZWaveEnabledHubs()
-                //zWaveHubs.foreach{
-                //                runDeviceCommand(it, "shutdown")
-                //                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Shutting down, please wait for graceful shutdown.")
-                //                TimeUnit.MINUTES.sleep(1)
-                //                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Cutting power, please wait for radios reset.")
-                //                TimeUnit.MINUTES.sleep(1)
-                //                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Restarting hub.")
-                //}
-            }
             command("get_open_sensors") {
                 val openSensors = deviceManager.findDevicesByType(Device.ContactSensor::class.java)
                     .mapNotNull { sensor ->
@@ -242,8 +233,8 @@ private suspend fun initHubs(): List<Device.Hub> {
             }.body<String>()).jsonObject
 
         val ip = (json["attributes"] as JsonArray).find {
-            it.jsonObject["name"]!!.jsonPrimitive.content.toString() == "localIP"
-        }!!.jsonObject["currentValue"]!!.jsonPrimitive.content.toString()
+            it.jsonObject["name"]!!.jsonPrimitive.content == "localIP"
+        }!!.jsonObject["currentValue"]!!.jsonPrimitive.content
         hub.ip = ip
         hub.managementToken = client.get("http://${ip}/hub/advanced/getManagementToken").body()
     }

@@ -24,6 +24,7 @@
   * `/get_open_sensors` - Lists all sensors that are currently open.
 
 * System Commands:
+  * `/list` - Shows all available devices grouped by type with their aliases.
   * `/cancel_alerts` - Cancels all alerts in HSM.
   * `/update` - Updates all hubs for which Hub Information Drivers are exposed in the Maker API of `hubitat.local`.
   * `/reboot [Hub Information Driver v3 instance name]` - Reboots a specified hub.

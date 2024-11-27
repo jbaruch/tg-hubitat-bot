@@ -19,7 +19,7 @@ class DeviceManager(deviceListJson: String) {
         val format = Json { ignoreUnknownKeys = true }
         devices = format.decodeFromString<List<Device>>(deviceListJson)
         deviceCache.clear()
-        val result: Pair<Int,List<String>> = Pair(devices.size, initializeCache(devices))
+        val result: Pair<Int, List<String>> = Pair(devices.size, initializeCache(devices))
         return result
     }
 
@@ -46,39 +46,93 @@ class DeviceManager(deviceListJson: String) {
         return devices.filterIsInstance(type)
     }
 
-        fun list(): String {
+    fun list(): String {
+        val deviceToAliases = mutableMapOf<Device, MutableList<String>>()
+        var maxDeviceNameLength = 0
+        var maxAliasesLength = 0
+
+        // Group aliases by device and find maximum lengths
+        deviceCache.forEach { (alias, device) ->
+            deviceToAliases.getOrPut(device) { mutableListOf() }.add(alias)
+            maxDeviceNameLength = maxOf(maxDeviceNameLength, device.label.length)
+            maxAliasesLength = maxOf(maxAliasesLength, deviceToAliases[device]!!.joinToString(", ").length)
+        }
+
+        // Ensure column headers don't get cut off
+        maxDeviceNameLength = maxOf(maxDeviceNameLength, "Device".length)
+        maxAliasesLength = maxOf(maxAliasesLength, "Aliases".length)
+
+        // Build the table string
+        val tableBuilder = StringBuilder()
+        tableBuilder.appendLine("```")
+        tableBuilder.appendLine("+" + "-".repeat(maxDeviceNameLength + 2) + "+" + "-".repeat(maxAliasesLength + 2) + "+")
+        tableBuilder.appendLine("| ${"Device".padEnd(maxDeviceNameLength)} | ${"Aliases".padEnd(maxAliasesLength)} |")
+        tableBuilder.appendLine("+" + "-".repeat(maxDeviceNameLength + 2) + "+" + "-".repeat(maxAliasesLength + 2) + "+")
+
+        deviceToAliases.forEach { (device, aliases) ->
+            val aliasesString = aliases.joinToString(", ")
+            tableBuilder.appendLine(
+                "| ${device.label.padEnd(maxDeviceNameLength)} | ${
+                    aliasesString.padEnd(
+                        maxAliasesLength
+                    )
+                } |"
+            )
+        }
+
+        tableBuilder.appendLine("+" + "-".repeat(maxDeviceNameLength + 2) + "+" + "-".repeat(maxAliasesLength + 2) + "+")
+
+        tableBuilder.appendLine("```")
+        return tableBuilder.toString()
+    }
+
+    fun listByType(): Map<String, String> {
+        // Group devices by their base type
+        val devicesByType = deviceCache.values.groupBy { device ->
+            when (device) {
+                is Device.Actuator -> "Actuators"
+                is Device.Button -> "Buttons"
+                is Device.Sensor -> "Sensors"
+                is Device.Shade -> "Shades"
+                is Device.Hub -> "Hubs"
+            }
+        }.toSortedMap()
+
+        return devicesByType.mapValues { (_, devices) ->
             val deviceToAliases = mutableMapOf<Device, MutableList<String>>()
             var maxDeviceNameLength = 0
             var maxAliasesLength = 0
 
-            // Group aliases by device and find maximum lengths
+            // Group aliases by device and find maximum lengths for this type
             deviceCache.forEach { (alias, device) ->
-                deviceToAliases.getOrPut(device) { mutableListOf() }.add(alias)
-                maxDeviceNameLength = maxOf(maxDeviceNameLength, device.label.length)
-                maxAliasesLength = maxOf(maxAliasesLength, deviceToAliases[device]!!.joinToString(", ").length)
+                if (devices.contains(device)) {
+                    deviceToAliases.getOrPut(device) { mutableListOf() }.add(alias)
+                    maxDeviceNameLength = maxOf(maxDeviceNameLength, device.label.length)
+                    maxAliasesLength = maxOf(maxAliasesLength, deviceToAliases[device]!!.joinToString(", ").length)
+                }
             }
 
             // Ensure column headers don't get cut off
             maxDeviceNameLength = maxOf(maxDeviceNameLength, "Device".length)
             maxAliasesLength = maxOf(maxAliasesLength, "Aliases".length)
 
-            // Build the table string
-            val tableBuilder = StringBuilder()
-            tableBuilder.appendLine("```")
-            tableBuilder.appendLine("+" + "-".repeat(maxDeviceNameLength + 2) + "+" + "-".repeat(maxAliasesLength + 2) + "+")
-            tableBuilder.appendLine("| ${"Device".padEnd(maxDeviceNameLength)} | ${"Aliases".padEnd(maxAliasesLength)} |")
-            tableBuilder.appendLine("+" + "-".repeat(maxDeviceNameLength + 2) + "+" + "-".repeat(maxAliasesLength + 2) + "+")
+            buildString {
+                appendLine("```")
+                appendLine("+" + "-".repeat(maxDeviceNameLength + 2) + "+" + "-".repeat(maxAliasesLength + 2) + "+")
+                appendLine("| ${"Device".padEnd(maxDeviceNameLength)} | ${"Aliases".padEnd(maxAliasesLength)} |")
+                appendLine("+" + "-".repeat(maxDeviceNameLength + 2) + "+" + "-".repeat(maxAliasesLength + 2) + "+")
 
-            deviceToAliases.forEach { (device, aliases) ->
-                val aliasesString = aliases.joinToString(", ")
-                tableBuilder.appendLine("| ${device.label.padEnd(maxDeviceNameLength)} | ${aliasesString.padEnd(maxAliasesLength)} |")
+                deviceToAliases.forEach { (device, aliases) ->
+                    val aliasesString = aliases.joinToString(", ")
+                    appendLine("| ${device.label.padEnd(maxDeviceNameLength)} | ${aliasesString.padEnd(maxAliasesLength)} |")
+                }
+
+                appendLine("+" + "-".repeat(maxDeviceNameLength + 2) + "+" + "-".repeat(maxAliasesLength + 2) + "+")
+                appendLine("```")
             }
-
-            tableBuilder.appendLine("+" + "-".repeat(maxDeviceNameLength + 2) + "+" + "-".repeat(maxAliasesLength + 2) + "+")
-
-            tableBuilder.appendLine("```")
-            return tableBuilder.toString()
         }
+    }
+
 
     override fun toString(): String {
         return devices.size.toString()
@@ -114,8 +168,8 @@ class DeviceManager(deviceListJson: String) {
         return warnings
     }
 
-    private fun addToCache(key: String, device: Device):List<String> {
-        var warnings: MutableList<String> = ArrayList()
+    private fun addToCache(key: String, device: Device): List<String> {
+        val warnings: MutableList<String> = ArrayList()
         if (deviceCache.containsKey(key)) {
             val message = "WARNING Duplicate key found in cache: $key"
             warnings.add(message)

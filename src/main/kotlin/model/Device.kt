@@ -14,7 +14,6 @@ sealed class Device {
     sealed class Actuator() : Device() {
         override val supportedOps: Map<String, Int> = mapOf("on" to 0, "off" to 0)
         override val attributes: Map<String, List<String>> = emptyMap()
-
     }
 
     @Serializable
@@ -46,18 +45,6 @@ sealed class Device {
     @Serializable
     @SerialName("SmartThings Multipurpose Sensor V5")
     data class SmartThingsMultipurposeSensorV5(override val id: Int, override val label: String) : ContactSensor()
-
-    @Serializable
-    @SerialName("Hub Information Driver v3")
-    data class Hub(
-        override val id: Int,
-        override val label: String,
-        var managementToken: String = "",
-        var ip: String = ""
-    ) : Device() {
-        override val supportedOps: Map<String, Int> = mapOf("reboot" to 0)
-        override val attributes: Map<String, List<String>> = emptyMap()
-    }
 
     @Serializable
     @SerialName("Virtual Switch")

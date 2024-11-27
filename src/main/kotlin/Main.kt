@@ -26,14 +26,19 @@ import com.github.kotlintelegrambot.entities.ParseMode.MARKDOWN_V2
 import com.github.kotlintelegrambot.extensions.filters.Filter
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
+import jbaru.ch.telegram.hubitat.model.Hub
+import jbaru.ch.telegram.hubitat.model.HubPowerManager
 
 private val BOT_TOKEN = getenv("BOT_TOKEN") ?: throw IllegalStateException("BOT_TOKEN not set")
 private val MAKER_API_APP_ID = getenv("MAKER_API_APP_ID") ?: throw IllegalStateException("MAKER_API_APP_ID not set")
 private val MAKER_API_TOKEN = getenv("MAKER_API_TOKEN") ?: throw IllegalStateException("MAKER_API_TOKEN not set")
 private val CHAT_ID = getenv("CHAT_ID") ?: ""
 private val DEFAULT_HUB_IP = getenv("DEFAULT_HUB_IP") ?: "hubitat.local"
+private val EWELINK_EMAIL = getenv("EWELINK_EMAIL") ?: throw IllegalStateException("EWELINK_EMAIL not set")
+private val EWELINK_PASSWORD = getenv("EWELINK_PASSWORD") ?: throw IllegalStateException("EWELINK_PASSWORD not set")
 
-private lateinit var hubs: List<Device.Hub>
+
+private lateinit var hubs: List<Hub>
 
 private val client = HttpClient(CIO)
 
@@ -45,6 +50,22 @@ fun main() {
         DeviceManager(getDevicesJson())
     }
     hubs = runBlocking { initHubs() }
+
+    val eweLinkSession = EweLinkSession(
+        email = EWELINK_EMAIL, password = EWELINK_PASSWORD
+    )
+
+    val hubPowerManager = HubPowerManager(eweLinkSession)
+
+    // Configure power control for hubs
+    hubs.forEach { hub ->
+        try {
+            hubPowerManager.configureHubPower(hub)
+            println("Configured deep reboot capability for ${hub.label}")
+        } catch (e: IllegalStateException) {
+            println("Note: ${hub.label} will not have deep reboot capability: ${e.message}")
+        }
+    }
 
     val bot = bot {
         token = BOT_TOKEN
@@ -60,13 +81,12 @@ fun main() {
                 bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = runCommandOnHsm("cancelAlerts"))
             }
             command("update") {
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = updateHubs().fold(
-                    onSuccess = { it },
-                    onFailure = {
+                bot.sendMessage(
+                    chatId = ChatId.fromId(message.chat.id),
+                    text = updateHubs().fold(onSuccess = { it }, onFailure = {
                         it.printStackTrace()
                         it.message.toString()
-                    }
-                ))
+                    }))
             }
             command("refresh") {
                 val refreshResults = deviceManager.refreshDevices(getDevicesJson())
@@ -76,35 +96,94 @@ fun main() {
                 )
             }
             command("list") {
-                bot.sendMessage(
-                    chatId = ChatId.fromId(message.chat.id),
-                    text = deviceManager.list(),
-                    parseMode = MARKDOWN_V2
-                )
+                val chatId = ChatId.fromId(message.chat.id)
+                deviceManager.listByType().forEach { (type, table) ->
+                    bot.sendMessage(
+                        chatId = chatId,
+                        text = "*$type*:\n$table",
+                        parseMode = MARKDOWN_V2
+                    )
+                }
             }
-            command("shutdown_restart") {
-                //find hubs with z-wave on and iterate on  them
 
-                //var zWaveHubs =  deviceManager.findZWaveEnabledHubs()
-                //zWaveHubs.foreach{
-                //                runDeviceCommand(it, "shutdown")
-                //                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Shutting down, please wait for graceful shutdown.")
-                //                TimeUnit.MINUTES.sleep(1)
-                //                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Cutting power, please wait for radios reset.")
-                //                TimeUnit.MINUTES.sleep(1)
-                //                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Restarting hub.")
-                //}
-            }
-            command("get_open_sensors") {
-                val openSensors = deviceManager.findDevicesByType(Device.ContactSensor::class.java)
-                    .mapNotNull { sensor ->
-                        val currentValue = getDeviceAttribute(sensor, "contact")
-                        if (currentValue == "open") {
-                            sensor.label
-                        } else {
-                            null
+            command("deep_reboot") {
+                val chatId = ChatId.fromId(message.chat.id)
+                if (message.text?.split(" ")?.size != 2) {
+                    bot.sendMessage(
+                        chatId = chatId,
+                        text = "Usage: /deep_reboot <hub_name>"
+                    )
+                    return@command
+                }
+
+                val hubName = message.text!!.split(" ")[1]
+                val hubResult = deviceManager.findDevice(hubName, "deepReboot")
+
+                when {
+                    hubResult.isFailure -> {
+                        bot.sendMessage(
+                            chatId = chatId,
+                            text = hubResult.exceptionOrNull()?.message ?: "Unknown error finding hub"
+                        )
+                        return@command
+                    }
+                    hubResult.getOrNull() !is Hub -> {
+                        bot.sendMessage(
+                            chatId = chatId,
+                            text = "Device '${hubName}' is not a hub"
+                        )
+                        return@command
+                    }
+                }
+
+                val hub = hubResult.getOrNull() as Hub
+                if (hub.powerControl == null) {
+                    bot.sendMessage(
+                        chatId = chatId,
+                        text = "Hub ${hub.label} does not support deep reboot (no power control configured)"
+                    )
+                    return@command
+                }
+
+                try {
+                    bot.sendMessage(
+                        chatId = chatId,
+                        text = "Starting deep reboot sequence for ${hub.label}..."
+                    )
+
+                    runBlocking {
+                        hub.deepReboot(client) { progressMessage ->
+                            println(progressMessage)  // Console log
+                            bot.sendMessage(         // Bot message
+                                chatId = chatId,
+                                text = progressMessage
+                            )
                         }
-                    }.joinToString(separator = "\n")
+                    }
+                } catch (e: Exception) {
+                    val errorMessage = when(e) {
+                        is UnsupportedOperationException -> e.message ?: "Operation not supported"
+                        else -> "Error during deep reboot: ${e.message}"
+                    }
+                    println("Deep reboot error for ${hub.label}: ${e.message}")
+                    e.printStackTrace()
+                    bot.sendMessage(
+                        chatId = chatId,
+                        text = errorMessage
+                    )
+                }
+            }
+
+            command("get_open_sensors") {
+                val openSensors =
+                    deviceManager.findDevicesByType(Device.ContactSensor::class.java).mapNotNull { sensor ->
+                            val currentValue = getDeviceAttribute(sensor, "contact")
+                            if (currentValue == "open") {
+                                sensor.label
+                            } else {
+                                null
+                            }
+                        }.joinToString(separator = "\n")
 
                 val response = if (openSensors.isNotEmpty()) {
                     "Open Sensors:\n$openSensors"
@@ -151,22 +230,19 @@ suspend fun handleDeviceCommand(bot: Bot, message: Message) {
     val deviceName = parts[1]
     val args = parts.drop(2)
 
-    val result = deviceManager.findDevice(deviceName, camelCaseCommand).fold(
-        onSuccess = { device ->
-            val argCount = device.supportedOps[camelCaseCommand]
-            if (argCount == null) {
-                "Command '/$snakeCaseCommand' is not supported by device '${device.label}'"
-            } else if (args.size != argCount) {
-                "Invalid number of arguments for /$snakeCaseCommand. Expected $argCount argument(s)."
-            } else {
-                runDeviceCommand(device, camelCaseCommand, args)
-            }
-        },
-        onFailure = {
-            it.printStackTrace()
-            it.message.toString()
+    val result = deviceManager.findDevice(deviceName, camelCaseCommand).fold(onSuccess = { device ->
+        val argCount = device.supportedOps[camelCaseCommand]
+        if (argCount == null) {
+            "Command '/$snakeCaseCommand' is not supported by device '${device.label}'"
+        } else if (args.size != argCount) {
+            "Invalid number of arguments for /$snakeCaseCommand. Expected $argCount argument(s)."
+        } else {
+            runDeviceCommand(device, camelCaseCommand, args)
         }
-    )
+    }, onFailure = {
+        it.printStackTrace()
+        it.message.toString()
+    })
 
     bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = result)
 }
@@ -197,8 +273,6 @@ suspend fun getDeviceAttribute(device: Device, attribute: String): String {
     return json["value"]?.jsonPrimitive?.content ?: "Unknown"
 }
 
-
-
 suspend fun runCommandOnHsm(command: String): String {
     return client.get("http://${DEFAULT_HUB_IP}/apps/api/${MAKER_API_APP_ID}/hsm/$command") {
         parameter("access_token", MAKER_API_TOKEN)
@@ -225,16 +299,16 @@ suspend fun updateHubs(): Result<String> {
         val failureMessages = failures.entries.joinToString("\n") { (name, status) ->
             "Failed to update hub $name Status: $status"
         }
-        val successMessages = statusMap.filterValues { it == HttpStatusCode.OK }
-            .entries.joinToString("\n") { (name, _) ->
-                "Successfully issued update request to hub $name"
-            }
+        val successMessages =
+            statusMap.filterValues { it == HttpStatusCode.OK }.entries.joinToString("\n") { (name, _) ->
+                    "Successfully issued update request to hub $name"
+                }
         Result.failure(Exception("$failureMessages\n$successMessages"))
     }
 }
 
-private suspend fun initHubs(): List<Device.Hub> {
-    val hubs = deviceManager.findDevicesByType(Device.Hub::class.java)
+private suspend fun initHubs(): List<Hub> {
+    val hubs = deviceManager.findDevicesByType(Hub::class.java)
     for (hub in hubs) {
         val json: Map<String, JsonElement> =
             Json.parseToJsonElement(client.get("http://${DEFAULT_HUB_IP}/apps/api/${MAKER_API_APP_ID}/devices/${hub.id}") {
@@ -242,14 +316,13 @@ private suspend fun initHubs(): List<Device.Hub> {
             }.body<String>()).jsonObject
 
         val ip = (json["attributes"] as JsonArray).find {
-            it.jsonObject["name"]!!.jsonPrimitive.content.toString() == "localIP"
-        }!!.jsonObject["currentValue"]!!.jsonPrimitive.content.toString()
+            it.jsonObject["name"]!!.jsonPrimitive.content == "localIP"
+        }!!.jsonObject["currentValue"]!!.jsonPrimitive.content
         hub.ip = ip
         hub.managementToken = client.get("http://${ip}/hub/advanced/getManagementToken").body()
     }
     return hubs
 }
-
 
 class DeviceCommandFilter : Filter {
     override fun Message.predicate(): Boolean {

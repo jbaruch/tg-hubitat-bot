@@ -1,0 +1,74 @@
+{
+  "itemType": 1,
+  "itemData": {
+    "name": "Micro-CFH",
+    "deviceid": "100118df86",
+    "apikey": "78fd82b3-f3c7-4ec2-a8ec-98e5a7678994",
+    "extra": {
+      "uiid": 77,
+      "description": "20201203014",
+      "brandId": "5c4c1aee3a7d24c7100be054",
+      "apmac": "d0:27:02:31:bc:5d",
+      "mac": "d0:27:02:31:bc:5c",
+      "ui": "单通道插座-多通道版",
+      "modelInfo": "5ed0740abfe8bf2abd1fa4d6",
+      "model": "CKW-MSW-01",
+      "manufacturer": "深圳松诺技术有限公司",
+      "staMac": "44:5D:5E:42:F1:66"
+    },
+    "brandName": "SONOFF",
+    "brandLogo": "https://us-ota.coolkit.cc/logo/q62PevoglDNmwUJ9oPE7kRrpt1nL1CoA.png",
+    "showBrand": true,
+    "productModel": "Micro-CFH",
+    "tags": {},
+    "devConfig": {},
+    "settings": {
+      "opsNotify": 0,
+      "opsHistory": 1,
+      "alarmNotify": 1,
+      "wxAlarmNotify": 0,
+      "wxOpsNotify": 0,
+      "wxDoorbellNotify": 0,
+      "appDoorbellNotify": 1
+    },
+    "devGroups": [],
+    "family": {
+      "familyid": "671910fb72b7f1000877441d",
+      "index": 0
+    },
+    "shareTo": [],
+    "devicekey": "00bca692-579b-40ad-99af-fdab1639e33f",
+    "online": false,
+    "params": {
+      "bindInfos": {},
+      "version": 8,
+      "sledOnline": "on",
+      "fwVersion": "3.6.0",
+      "staMac": "44:5D:5E:42:F1:66",
+      "rssi": -127,
+      "switches": [
+        {
+          "outlet": 0,
+          "switch": "on"
+        },
+        {
+          "outlet": 1,
+          "switch": "off"
+        },
+        {
+          "outlet": 2,
+          "switch": "off"
+        },
+        {
+          "outlet": 3,
+          "switch": "off"
+        }
+      ]
+    },
+    "isSupportGroup": true,
+    "isSupportedOnMP": true,
+    "isSupportChannelSplit": false,
+    "deviceFeature": {}
+  },
+  "index": 0
+}

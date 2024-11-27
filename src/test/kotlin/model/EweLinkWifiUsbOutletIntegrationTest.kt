@@ -2,70 +2,80 @@ package jbaru.ch.telegram.hubitat.model
 
 import jbaru.ch.telegram.hubitat.EweLinkManager
 import jbaru.ch.telegram.hubitat.EweLinkSession
-import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.*
 import java.lang.System.getenv
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class EweLinkWifiUsbOutletIntegrationTest {
+class OutletStatusMethodOrderer : MethodOrderer {
+    companion object {
+        var isLastTest = false
+        private var executedTests = 0
+        private const val TOTAL_TESTS = 2
 
-    private lateinit var session: EweLinkSession
-    private lateinit var manager: EweLinkManager
+        fun markTestExecuted() {
+            executedTests++
+            isLastTest = executedTests >= TOTAL_TESTS
+        }
+    }
+
+    override fun orderMethods(context: MethodOrdererContext) {
+        val outlet = EweLinkWifiUsbOutletIntegrationTest.getTestOutlet()
+        val currentStatus = outlet.getCurrentStatus()
+
+        context.methodDescriptors.sortWith { m1, m2 ->
+            when {
+                currentStatus == "on" && m1.method.name.contains("off") -> -1
+                currentStatus == "off" && m1.method.name.contains("on") -> -1
+                else -> 1
+            }
+        }
+    }
+}
+
+@TestMethodOrder(OutletStatusMethodOrderer::class)
+class EweLinkWifiUsbOutletIntegrationTest {
+    private lateinit var outlet: EweLinkWifiUsbOutlet
+
+    companion object {
+        private fun getSession() = EweLinkSession(
+            email = getenv("EWELINK_EMAIL") ?: throw IllegalStateException("EWELINK_EMAIL not set"),
+            password = getenv("EWELINK_PASSWORD") ?: throw IllegalStateException("EWELINK_PASSWORD not set")
+        )
+
+        private val manager = EweLinkManager(getSession())
+
+        fun getTestOutlet(): EweLinkWifiUsbOutlet {
+            val testDevice = manager.findByName("Test")
+                ?: throw IllegalStateException("Test device not found")
+            return EweLinkWifiUsbOutlet.fromThing(testDevice, manager)
+        }
+    }
 
     @BeforeEach
     fun setup() {
-        session = EweLinkSession(
-            email = getenv("EWELINK_EMAIL") ?: throw IllegalStateException("EWELINK_EMAIL not set"),
-            password = getenv("EWELINK_PASSWORD") ?: throw IllegalStateException("EWELINK_PASSWORD not set"),
-        )
-        manager = EweLinkManager(session)
+        outlet = getTestOutlet()
+    }
+
+    @AfterEach
+    fun cleanup() {
+        OutletStatusMethodOrderer.markTestExecuted()
+        if (!OutletStatusMethodOrderer.isLastTest) {
+            Thread.sleep(2000)
+        }
     }
 
     @Test
-    fun `test real device outlet toggle`() {
-//        val testDevice = manager.findByName("Test")
-//            ?: throw IllegalStateException("Test device not found")
-//
-//        val outlet = EweLinkWifiUsbOutlet(
-//            name = testDevice.itemData.name,
-//            id = testDevice.itemData.deviceid,
-//            eweLinkManager = manager
-//        )
-//
-//        // Get initial state
-//        val initialState = outlet.status(0) // refresh = true by default
-//        println("Initial state: $initialState")
-//
-//        // Toggle to opposite state
-//        when (initialState) {
-//            SwitchState.ON -> {
-//                outlet.off(0)
-//                Thread.sleep(3000)
-//                assertEquals(SwitchState.OFF, outlet.status(0))
-//            }
-//            SwitchState.OFF -> {
-//                outlet.on(0)
-//                Thread.sleep(3000)
-//                assertEquals(SwitchState.ON, outlet.status(0))
-//            }
-//            SwitchState.UNKNOWN -> {
-//                throw IllegalStateException("Device returned unknown state")
-//            }
-//        }
-//
-//        // Return to initial state
-//        when (initialState) {
-//            SwitchState.ON -> {
-//                outlet.on(0)
-//                Thread.sleep(3000)
-//                assertEquals(SwitchState.ON, outlet.status(0))
-//            }
-//            SwitchState.OFF -> {
-//                outlet.off(0)
-//                Thread.sleep(3000)
-//                assertEquals(SwitchState.OFF, outlet.status(0))
-//            }
-//            SwitchState.UNKNOWN -> {}
-//        }
+    fun `test turning outlet off`() {
+        outlet.powerOff()
+        Thread.sleep(3000)
+        assertEquals("off", outlet.getCurrentStatus())
+    }
+
+    @Test
+    fun `test turning outlet on`() {
+        outlet.powerOn()
+        Thread.sleep(3000)
+        assertEquals("on", outlet.getCurrentStatus())
     }
 }

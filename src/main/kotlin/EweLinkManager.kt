@@ -3,9 +3,6 @@ package jbaru.ch.telegram.hubitat
 import com.github.realzimboguy.ewelink.api.EweLink
 import com.github.realzimboguy.ewelink.api.model.home.OutletSwitch
 import com.github.realzimboguy.ewelink.api.model.home.Thing
-import com.github.realzimboguy.ewelink.api.wss.WssResponse
-import com.github.realzimboguy.ewelink.api.wss.wssrsp.WssRspMsg
-import java.util.concurrent.TimeUnit
 
 class EweLinkManager(private val session: EweLinkSession) {
 
@@ -36,14 +33,6 @@ class EweLinkManager(private val session: EweLinkSession) {
         val deviceId = findByName(name)?.itemData?.deviceid
             ?: throw IllegalArgumentException("Device '$name' not found")
 
-        eweLink.getWebSocket(object : WssResponse {
-            override fun onMessage(s: String) {}
-            override fun onMessageParsed(rsp: WssRspMsg) {}
-            override fun onError(error: String) {
-                throw RuntimeException("WebSocket error: $error")
-            }
-        })
-        TimeUnit.SECONDS.sleep(3)
         eweLink.setMultiDeviceStatus(deviceId, listOf(outletSwitch))
 
         // Refresh after state change

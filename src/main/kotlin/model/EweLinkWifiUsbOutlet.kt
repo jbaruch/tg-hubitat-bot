@@ -26,6 +26,17 @@ class EweLinkWifiUsbOutlet(
         eweLinkManager.apply(name, outletSwitch)
     }
 
+    fun getCurrentStatus(): String {
+        eweLinkManager.refreshDevices()
+        return eweLinkManager.findByName(name)
+            ?.itemData
+            ?.params
+            ?.switches
+            ?.firstOrNull { it.outlet == outletNumber }
+            ?._switch
+            ?: throw IllegalStateException("Could not get outlet status")
+    }
+
     companion object {
         fun fromThing(thing: Thing, eweLinkManager: EweLinkManager, outletNumber: Int = 0): EweLinkWifiUsbOutlet {
             return EweLinkWifiUsbOutlet(

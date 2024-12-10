@@ -33,7 +33,11 @@ class EweLinkManager(private val session: EweLinkSession) {
         val deviceId = findByName(name)?.itemData?.deviceid
             ?: throw IllegalArgumentException("Device '$name' not found")
 
-        eweLink.setMultiDeviceStatus(deviceId, listOf(outletSwitch))
+        try {
+            eweLink.setMultiDeviceStatus(deviceId, listOf(outletSwitch))
+        } catch (e: Exception) {
+            throw RuntimeException("Failed to set device status: ${e.message ?: e.javaClass.simpleName}. This may be due to a WebSocket connection issue.", e)
+        }
 
         // Refresh after state change
         refreshDevices()
@@ -54,6 +58,27 @@ class EweLinkSession(
         if (!isLoggedIn) {
             eweLink.login()
             isLoggedIn = true
+            // Wait for WebSocket to be connected by attempting a no-op command
+            var retries = 0
+            while (retries < 10) {
+                try {
+                    // Try to get things as a connection test
+                    eweLink.things
+                    break // If successful, WebSocket is connected
+                } catch (e: Exception) {
+                    if (e.cause?.toString()?.contains("WebsocketNotConnectedException") == true) {
+                        retries++
+                        if (retries < 10) {
+                            Thread.sleep(500) // Wait 500ms between checks
+                        }
+                    } else {
+                        throw e // Some other error occurred
+                    }
+                }
+            }
+            if (retries == 10) {
+                throw RuntimeException("Failed to establish WebSocket connection after login")
+            }
         }
     }
 

@@ -7,42 +7,40 @@ import com.github.kotlintelegrambot.dispatcher.command
 import com.github.kotlintelegrambot.dispatcher.message
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.Message
-import io.ktor.client.*
-import io.ktor.client.call.body
-import io.ktor.client.engine.cio.*
-import io.ktor.client.request.get
-import io.ktor.client.request.parameter
-import io.ktor.http.HttpStatusCode
-import jbaru.ch.telegram.hubitat.model.Device
-import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import java.lang.System.getenv
-import com.github.kotlintelegrambot.logging.LogLevel
 import com.github.kotlintelegrambot.entities.ParseMode.MARKDOWN_V2
 import com.github.kotlintelegrambot.extensions.filters.Filter
-import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.bodyAsText
+import com.github.kotlintelegrambot.logging.LogLevel
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.engine.cio.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import jbaru.ch.telegram.hubitat.model.Device
 import jbaru.ch.telegram.hubitat.model.Hub
 import jbaru.ch.telegram.hubitat.model.HubPowerManager
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.*
+import java.lang.System.getenv
+import kotlin.collections.component1
+import kotlin.collections.component2
+import kotlin.collections.set
 
 private val BOT_TOKEN = getenv("BOT_TOKEN") ?: throw IllegalStateException("BOT_TOKEN not set")
 private val MAKER_API_APP_ID = getenv("MAKER_API_APP_ID") ?: throw IllegalStateException("MAKER_API_APP_ID not set")
 private val MAKER_API_TOKEN = getenv("MAKER_API_TOKEN") ?: throw IllegalStateException("MAKER_API_TOKEN not set")
-private val CHAT_ID = getenv("CHAT_ID") ?: ""
+internal val CHAT_ID = getenv("CHAT_ID") ?: throw IllegalStateException("CHAT_ID environment variable is not set")
 private val DEFAULT_HUB_IP = getenv("DEFAULT_HUB_IP") ?: "hubitat.local"
 private val EWELINK_EMAIL = getenv("EWELINK_EMAIL") ?: throw IllegalStateException("EWELINK_EMAIL not set")
 private val EWELINK_PASSWORD = getenv("EWELINK_PASSWORD") ?: throw IllegalStateException("EWELINK_PASSWORD not set")
 
 
-private lateinit var hubs: List<Hub>
+internal var hubs: List<Hub> = emptyList()
 
-private val client = HttpClient(CIO)
+internal var client = HttpClient(CIO)
 
 private lateinit var deviceManager: DeviceManager
+internal lateinit var bot: Bot
 
 fun main() {
 
@@ -67,7 +65,7 @@ fun main() {
         }
     }
 
-    val bot = bot {
+    bot = bot {
         token = BOT_TOKEN
         logLevel = LogLevel.Network.Basic
 
@@ -81,12 +79,28 @@ fun main() {
                 bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = runCommandOnHsm("cancelAlerts"))
             }
             command("update") {
-                bot.sendMessage(
-                    chatId = ChatId.fromId(message.chat.id),
-                    text = updateHubs().fold(onSuccess = { it }, onFailure = {
-                        it.printStackTrace()
-                        it.message.toString()
-                    }))
+                updateHubs(
+                    sendMessage = { msg ->
+                        bot.sendMessage(
+                            chatId = ChatId.fromId(message.chat.id),
+                            text = msg
+                        )
+                    }
+                ).fold(
+                    onSuccess = { result ->
+                        bot.sendMessage(
+                            chatId = ChatId.fromId(message.chat.id),
+                            text = result
+                        )
+                    },
+                    onFailure = { error ->
+                        error.printStackTrace()
+                        bot.sendMessage(
+                            chatId = ChatId.fromId(message.chat.id),
+                            text = error.message.toString()
+                        )
+                    }
+                )
             }
             command("refresh") {
                 val refreshResults = deviceManager.refreshDevices(getDevicesJson())
@@ -279,32 +293,95 @@ suspend fun runCommandOnHsm(command: String): String {
     }.status.description
 }
 
-suspend fun updateHubs(): Result<String> {
-    val statusMap = mutableMapOf<String, HttpStatusCode>()
-
+suspend fun updateHubs(
+    maxAttempts: Int = 20, 
+    delayMillis: Long = 30000,
+    sendMessage: suspend (String) -> Unit
+): Result<String> {
+    // First, get current and available versions for all hubs
+    val initialStatus = StringBuilder("Current hub versions:\n")
+    val hubsToUpdate = mutableListOf<Hub>()
+    
     for (hub in hubs) {
+        try {
+            hub.currentVersion = getDeviceAttribute(hub, "firmwareVersionString")
+            hub.updateVersion = getDeviceAttribute(hub, "hubUpdateVersion")
+            initialStatus.append("${hub.label}: ${hub.currentVersion} (update available: ${hub.updateVersion})\n")
+            
+            if (hub.currentVersion == hub.updateVersion) {
+                initialStatus.append("  - No update needed\n")
+            } else {
+                hubsToUpdate.add(hub)
+            }
+        } catch (e: Exception) {
+            return Result.failure(Exception("Failed to get version info for hub ${hub.label}: ${e.message}"))
+        }
+    }
+
+    sendMessage(initialStatus.toString())
+
+    if (hubsToUpdate.isEmpty()) {
+        return Result.success("No updates needed - all hubs are up to date")
+    }
+
+    sendMessage("Starting update process for ${hubsToUpdate.size} hub(s)...")
+
+    // Initiate updates
+    val statusMap = mutableMapOf<String, Pair<HttpStatusCode, String?>>()
+    for (hub in hubsToUpdate) {
         try {
             val response = client.get("http://${hub.ip}/management/firmwareUpdate") {
                 parameter("token", hub.managementToken)
             }
-            statusMap[hub.label] = response.status
-        } catch (_: Exception) {
-            statusMap[hub.label] = HttpStatusCode.InternalServerError
+            statusMap[hub.label] = response.status to null
+        } catch (e: Exception) {
+            statusMap[hub.label] = HttpStatusCode.InternalServerError to e.message
         }
     }
-    val failures = statusMap.filterValues { it != HttpStatusCode.OK }
-    return if (failures.isEmpty()) {
-        Result.success("All hub updates initialized successfully.")
-    } else {
+
+    val failures = statusMap.filterValues { it.first != HttpStatusCode.OK }
+    if (failures.isNotEmpty()) {
         val failureMessages = failures.entries.joinToString("\n") { (name, status) ->
-            "Failed to update hub $name Status: $status"
+            "Failed to update hub $name Status: ${status.first}${status.second?.let { " - $it" } ?: ""}"
         }
-        val successMessages =
-            statusMap.filterValues { it == HttpStatusCode.OK }.entries.joinToString("\n") { (name, _) ->
-                    "Successfully issued update request to hub $name"
-                }
-        Result.failure(Exception("$failureMessages\n$successMessages"))
+        val successMessages = statusMap.filterValues { it.first == HttpStatusCode.OK }.keys.joinToString("\n") { name ->
+            "Successfully issued update request to hub $name"
+        }
+        return Result.failure(Exception("$failureMessages\n$successMessages"))
     }
+
+    // Wait for each hub to complete update
+    val updatedHubs = mutableSetOf<String>()
+    var attempts = 0
+    
+    while (updatedHubs.size < hubsToUpdate.size && attempts < maxAttempts) {
+        kotlinx.coroutines.delay(delayMillis)
+        attempts++
+        
+        for (hub in hubsToUpdate) {
+            if (hub.label !in updatedHubs) {
+                try {
+                    val newVersion = getDeviceAttribute(hub, "firmwareVersionString")
+                    if (newVersion == hub.updateVersion) {
+                        updatedHubs.add(hub.label)
+                        sendMessage("Hub ${hub.label} updated from ${hub.currentVersion} to $newVersion")
+                        hub.currentVersion = newVersion
+                    }
+                } catch (e: Exception) {
+                    // Hub is probably rebooting, continue waiting
+                    continue
+                }
+            }
+        }
+    }
+
+    if (updatedHubs.size < hubsToUpdate.size) {
+        val notUpdated = hubsToUpdate.filter { it.label !in updatedHubs }
+            .joinToString("\n") { "${it.label} (still at version ${it.currentVersion})" }
+        return Result.failure(Exception("Timeout waiting for hubs to complete update after ${maxAttempts * (delayMillis / 1000)} seconds\nNot updated:\n$notUpdated"))
+    }
+
+    return Result.success("All hubs updated successfully")
 }
 
 private suspend fun initHubs(): List<Hub> {

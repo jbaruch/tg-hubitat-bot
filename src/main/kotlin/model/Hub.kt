@@ -1,4 +1,4 @@
-package jbaru.ch.telegram.hubitat.model
+package jbaru.ch.telegram.hubitat.jbaru.ch.telegram.hubitat.model
 
 import io.ktor.client.*
 import jbaru.ch.telegram.hubitat.EweLinkManager
@@ -19,11 +19,13 @@ data class Hub(
         "reboot" to 0,
         "deepReboot" to 0
     )
-    override val attributes: Map<String, List<String>> = emptyMap()
+    override val attributes: Map<String, List<String>> = mapOf(
+        "firmwareVersionString" to listOf("string")
+    )
 
     suspend fun deepReboot(client: HttpClient, progressCallback: suspend (String) -> Unit) {
         powerControl?.deepReboot(this, client, progressCallback)
-            ?: throw UnsupportedOperationException("Deep reboot not supported for hub ${label} - no power control configured")
+            ?: throw UnsupportedOperationException("Deep reboot not supported for hub $label - no power control configured")
     }
 }
 

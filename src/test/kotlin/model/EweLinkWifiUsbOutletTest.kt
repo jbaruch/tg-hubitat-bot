@@ -2,6 +2,8 @@ package jbaru.ch.telegram.hubitat.model
 
 import io.ktor.client.*
 import jbaru.ch.telegram.hubitat.EweLinkManager
+import jbaru.ch.telegram.hubitat.jbaru.ch.telegram.hubitat.model.EweLinkWifiUsbOutlet
+import jbaru.ch.telegram.hubitat.jbaru.ch.telegram.hubitat.model.Hub
 import jbaru.ch.telegram.hubitat.runDeviceCommand
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach

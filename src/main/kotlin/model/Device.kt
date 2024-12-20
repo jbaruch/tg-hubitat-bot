@@ -1,7 +1,8 @@
 @file:Suppress("unused")
 
-package jbaru.ch.telegram.hubitat.model
-import kotlinx.serialization.*
+package jbaru.ch.telegram.hubitat.jbaru.ch.telegram.hubitat.model
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 @Serializable
 sealed class Device {
@@ -11,30 +12,30 @@ sealed class Device {
     abstract val attributes: Map<String, List<String>>
 
     @Serializable
-    sealed class Actuator() : Device() {
+    sealed class Actuator : Device() {
         override val supportedOps: Map<String, Int> = mapOf("on" to 0, "off" to 0)
         override val attributes: Map<String, List<String>> = emptyMap()
     }
 
     @Serializable
-    sealed class Button() : Device() {
+    sealed class Button : Device() {
         override val supportedOps: Map<String, Int> = mapOf("doubleTap" to 1, "hold" to 1, "push" to 1, "release" to 1)
         override val attributes: Map<String, List<String>> = emptyMap()
     }
 
     @Serializable
-    sealed class Shade() : Device() {
+    sealed class Shade : Device() {
         override val supportedOps: Map<String, Int> = mapOf("open" to 0, "close" to 0)
         override val attributes: Map<String, List<String>> = emptyMap()
     }
 
     @Serializable
-    sealed class Sensor() : Device() {
+    sealed class Sensor : Device() {
         override val supportedOps: Map<String, Int> = emptyMap()
     }
 
     @Serializable
-    sealed class ContactSensor() : Sensor() {
+    sealed class ContactSensor : Sensor() {
         override val attributes: Map<String, List<String>> = mapOf("contact" to listOf("open", "closed"))
     }
 

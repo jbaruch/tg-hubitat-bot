@@ -2,12 +2,12 @@ package jbaru.ch.telegram.hubitat.model
 
 import jbaru.ch.telegram.hubitat.EweLinkManager
 import jbaru.ch.telegram.hubitat.EweLinkSession
+import jbaru.ch.telegram.hubitat.jbaru.ch.telegram.hubitat.model.EweLinkWifiUsbOutlet
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.*
 import java.lang.System.getenv
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import org.junit.jupiter.api.assertThrows
 
 class OutletStatusMethodOrderer : MethodOrderer {
     companion object {
@@ -89,9 +89,9 @@ class EweLinkWifiUsbOutletIntegrationTest {
     }
 
     @Test
-    fun `test power off fails when websocket is not ready after login`() = runBlocking {
-        val email = System.getenv("EWELINK_EMAIL") ?: throw IllegalStateException("EWELINK_EMAIL not set")
-        val password = System.getenv("EWELINK_PASSWORD") ?: throw IllegalStateException("EWELINK_PASSWORD not set")
+    fun `test power off fails when websocket is not ready after login`(): Unit = runBlocking {
+        val email = getenv("EWELINK_EMAIL") ?: throw IllegalStateException("EWELINK_EMAIL not set")
+        val password = getenv("EWELINK_PASSWORD") ?: throw IllegalStateException("EWELINK_PASSWORD not set")
         
         // Create a session with minimal timeout to ensure WebSocket won't connect in time
         val session = EweLinkSession(email = email, password = password, timeoutSeconds = 1)

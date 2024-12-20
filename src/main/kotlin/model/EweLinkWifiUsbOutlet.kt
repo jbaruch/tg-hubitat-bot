@@ -1,4 +1,4 @@
-package jbaru.ch.telegram.hubitat.model
+package jbaru.ch.telegram.hubitat.jbaru.ch.telegram.hubitat.model
 
 import com.github.realzimboguy.ewelink.api.model.home.OutletSwitch
 import com.github.realzimboguy.ewelink.api.model.home.Thing

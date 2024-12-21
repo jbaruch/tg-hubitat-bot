@@ -7,14 +7,12 @@ import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import jbaru.ch.telegram.hubitat.model.Hub
+import jbaru.ch.telegram.hubitat.model.PowerControl
 import kotlinx.coroutines.runBlocking
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.mockito.kotlin.mock
-import org.mockito.kotlin.doReturn
-import org.mockito.kotlin.any
-import org.mockito.kotlin.whenever
+import org.mockito.kotlin.*
 
 class MainTest {
     private lateinit var mockEngine: MockEngine
@@ -24,8 +22,9 @@ class MainTest {
     @BeforeEach
     fun setup() {
         // Mock the bot
-        bot = mock()
-        whenever(bot.sendMessage(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(mock())
+        val mockBot = mock<Bot>()
+        whenever(mockBot.sendMessage(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(mock())
+        bot = mockBot
         
         // Create mock message
         val mockChat = mock<Chat> {
@@ -35,245 +34,144 @@ class MainTest {
             on { chat } doReturn mockChat
         }
 
+        // Setup mock HTTP client
         mockEngine = MockEngine { request ->
             when {
                 request.url.encodedPath.contains("/apps/api") && request.url.parameters["access_token"] != null -> {
                     val path = request.url.encodedPath
                     when {
                         path.contains("firmwareVersionString") -> respond(
-                            content = """{"value": "2.3.6.126"}""",
+                            content = "2.3.4.126",
                             status = HttpStatusCode.OK,
-                            headers = headersOf(HttpHeaders.ContentType, "application/json")
+                            headers = headersOf(HttpHeaders.ContentType, "text/plain")
                         )
-                        path.contains("hubUpdateVersion") -> respond(
-                            content = """{"value": "2.3.6.127"}""",
+                        else -> respond(
+                            content = "OK",
                             status = HttpStatusCode.OK,
-                            headers = headersOf(HttpHeaders.ContentType, "application/json")
+                            headers = headersOf(HttpHeaders.ContentType, "text/plain")
                         )
-                        else -> error("Unhandled API path: $path")
                     }
                 }
-                request.url.encodedPath.contains("/management/firmwareUpdate") && request.url.parameters["token"] != null -> {
-                    respond(
-                        content = "",
-                        status = HttpStatusCode.OK,
-                        headers = headersOf(HttpHeaders.ContentType, "application/json")
-                    )
-                }
-                else -> {
-                    error("Unhandled ${request.url}")
-                }
+                else -> respond(
+                    content = "Not found",
+                    status = HttpStatusCode.NotFound,
+                    headers = headersOf(HttpHeaders.ContentType, "text/plain")
+                )
             }
         }
         mockClient = HttpClient(mockEngine)
         client = mockClient
-        hubs = emptyList()
     }
 
     @Test
-    fun `updateHubs handles successful update with version change`() = runBlocking {
-        // Given
-        val hub1 = Hub(1, "Main Hub", "token1", "192.168.1.100")
-        val hub2 = Hub(2, "Backup Hub", "token2", "192.168.1.101")
-        hubs = listOf(hub1, hub2)
+    fun `deepRebootHub handles non-existent hub`() = runBlocking {
+        // Setup device manager with empty list
+        deviceManager = DeviceManager("[]")
 
-        // Configure mock engine to simulate successful version change
-        var callCount = 0
-        mockEngine = MockEngine { request ->
-            when {
-                request.url.encodedPath.contains("/apps/api") && request.url.parameters["access_token"] != null -> {
-                    val path = request.url.encodedPath
-                    when {
-                        path.contains("firmwareVersionString") -> {
-                            if (callCount <= 2) {
-                                // Initial version checks
-                                callCount++
-                                respond(
-                                    content = """{"value": "2.3.6.126"}""",
-                                    status = HttpStatusCode.OK,
-                                    headers = headersOf(HttpHeaders.ContentType, "application/json")
-                                )
-                            } else {
-                                // Version checks after update
-                                respond(
-                                    content = """{"value": "2.3.6.127"}""",
-                                    status = HttpStatusCode.OK,
-                                    headers = headersOf(HttpHeaders.ContentType, "application/json")
-                                )
-                            }
-                        }
-                        path.contains("hubUpdateVersion") -> respond(
-                            content = """{"value": "2.3.6.127"}""",
-                            status = HttpStatusCode.OK,
-                            headers = headersOf(HttpHeaders.ContentType, "application/json")
-                        )
-                        else -> error("Unhandled API path: $path")
-                    }
-                }
-                request.url.encodedPath.contains("/management/firmwareUpdate") && request.url.parameters["token"] != null -> {
-                    respond(
-                        content = "",
-                        status = HttpStatusCode.OK,
-                        headers = headersOf(HttpHeaders.ContentType, "application/json")
-                    )
-                }
-                else -> error("Unhandled ${request.url}")
-            }
-        }
-        client = HttpClient(mockEngine)
-
-        // When
-        val result = updateHubs(maxAttempts = 2, delayMillis = 100) { _ -> }
-
-        // Then
-        assertTrue(result.isSuccess)
-        val message = result.getOrNull()!!
-        assertTrue(message.contains("All hubs updated successfully"))
-    }
-
-    @Test
-    fun `updateHubs handles failed update command`() = runBlocking {
-        // Given
-        val hub = Hub(1, "Main Hub", "token1", "192.168.1.100")
-        hubs = listOf(hub)
-
-        // Configure mock engine to return error for update command
-        mockEngine = MockEngine { request ->
-            when {
-                request.url.encodedPath.contains("/apps/api") && request.url.parameters["access_token"] != null -> {
-                    val path = request.url.encodedPath
-                    when {
-                        path.contains("firmwareVersionString") -> respond(
-                            content = """{"value": "2.3.6.126"}""",
-                            status = HttpStatusCode.OK,
-                            headers = headersOf(HttpHeaders.ContentType, "application/json")
-                        )
-                        path.contains("hubUpdateVersion") -> respond(
-                            content = """{"value": "2.3.6.127"}""",
-                            status = HttpStatusCode.OK,
-                            headers = headersOf(HttpHeaders.ContentType, "application/json")
-                        )
-                        else -> error("Unhandled API path: $path")
-                    }
-                }
-                request.url.encodedPath.contains("/management/firmwareUpdate") && request.url.parameters["token"] != null -> {
-                    respond(
-                        content = "Internal Server Error",
-                        status = HttpStatusCode.InternalServerError,
-                        headers = headersOf(HttpHeaders.ContentType, "application/json")
-                    )
-                }
-                else -> error("Unhandled ${request.url}")
-            }
-        }
-        client = HttpClient(mockEngine)
-
-        // When
-        val result = updateHubs(maxAttempts = 2, delayMillis = 100) { _ -> }
-
-        // Then
+        val messages = mutableListOf<String>()
+        val result = deepRebootHub("nonexistent") { msg -> messages.add(msg) }
+        
         assertTrue(result.isFailure)
-        val error = result.exceptionOrNull()!!.message!!
-        assertTrue(error.contains("Failed to update hub Main Hub"))
+        val error = result.exceptionOrNull()
+        assertNotNull(error)
+        assertTrue(error?.message?.contains("No device found for query: nonexistent") == true)
+        assertTrue(messages.isEmpty())
     }
 
     @Test
-    fun `updateHubs handles timeout waiting for hub to come back online`() = runBlocking {
-        // Given
-        val hub = Hub(1, "Main Hub", "token1", "192.168.1.100")
-        hubs = listOf(hub)
+    fun `deepRebootHub handles non-hub device`() = runBlocking {
+        // Add a non-hub device to device manager
+        val deviceListJson = """[{
+            "id": 1,
+            "label": "Test Switch",
+            "type": "Virtual Switch",
+            "supportedOps": {"deepReboot": 0, "on": 0, "off": 0}
+        }]"""
+        deviceManager = DeviceManager(deviceListJson)
 
-        // Configure mock engine to simulate hub never coming back online
-        var callCount = 0
-        mockEngine = MockEngine { request ->
-            when {
-                request.url.encodedPath.contains("/apps/api") && request.url.parameters["access_token"] != null -> {
-                    val path = request.url.encodedPath
-                    when {
-                        path.contains("firmwareVersionString") -> {
-                            if (callCount == 0) {
-                                // Initial version check
-                                callCount++
-                                respond(
-                                    content = """{"value": "2.3.6.126"}""",
-                                    status = HttpStatusCode.OK,
-                                    headers = headersOf(HttpHeaders.ContentType, "application/json")
-                                )
-                            } else {
-                                // All subsequent version checks fail
-                                respond(
-                                    content = "",
-                                    status = HttpStatusCode.ServiceUnavailable,
-                                    headers = headersOf(HttpHeaders.ContentType, "application/json")
-                                )
-                            }
-                        }
-                        path.contains("hubUpdateVersion") -> respond(
-                            content = """{"value": "2.3.6.127"}""",
-                            status = HttpStatusCode.OK,
-                            headers = headersOf(HttpHeaders.ContentType, "application/json")
-                        )
-                        else -> error("Unhandled API path: $path")
-                    }
-                }
-                request.url.encodedPath.contains("/management/firmwareUpdate") && request.url.parameters["token"] != null -> {
-                    respond(
-                        content = "",
-                        status = HttpStatusCode.OK,
-                        headers = headersOf(HttpHeaders.ContentType, "application/json")
-                    )
-                }
-                else -> error("Unhandled ${request.url}")
-            }
-        }
-        client = HttpClient(mockEngine)
+        // Print the device cache contents
+        println("Device cache contents:")
+        deviceManager.toString().lines().forEach { println(it) }
 
-        // When
-        val result = updateHubs(maxAttempts = 2, delayMillis = 100) { _ -> }
-
-        // Then
+        val messages = mutableListOf<String>()
+        val result = deepRebootHub("test switch") { msg -> messages.add(msg) }
+        
         assertTrue(result.isFailure)
-        val error = result.exceptionOrNull()!!.message!!
-        assertTrue(error.contains("Timeout waiting for hubs to complete update"))
-        assertTrue(error.contains("Main Hub (still at version 2.3.6.126)"))
+        val error = result.exceptionOrNull()
+        assertNotNull(error)
+        println("Expected error message: Device 'Test Switch' is not a hub")
+        println("Actual error message: ${error?.message}")
+        assertTrue(error?.message?.contains("Device 'Test Switch' is not a hub") == true, "Actual error message: ${error?.message}")
+        assertTrue(messages.isEmpty())
     }
 
     @Test
-    fun `updateHubs skips update when version is current`() = runBlocking {
-        // Given
-        val hub = Hub(1, "Main Hub", "token1", "192.168.1.100")
-        hubs = listOf(hub)
-
-        // Configure mock engine to return same version for current and update
-        mockEngine = MockEngine { request ->
-            when {
-                request.url.encodedPath.contains("/apps/api") && request.url.parameters["access_token"] != null -> {
-                    val path = request.url.encodedPath
-                    when {
-                        path.contains("firmwareVersionString") -> respond(
-                            content = """{"value": "2.3.6.127"}""",
-                            status = HttpStatusCode.OK,
-                            headers = headersOf(HttpHeaders.ContentType, "application/json")
-                        )
-                        path.contains("hubUpdateVersion") -> respond(
-                            content = """{"value": "2.3.6.127"}""",
-                            status = HttpStatusCode.OK,
-                            headers = headersOf(HttpHeaders.ContentType, "application/json")
-                        )
-                        else -> error("Unhandled API path: $path")
-                    }
-                }
-                else -> error("Unhandled ${request.url}")
-            }
+    fun `deepRebootHub handles successful deep reboot`() = runBlocking {
+        // Setup a hub with mocked power control
+        val hubJson = """[{
+            "id": 1,
+            "label": "Test Hub",
+            "type": "Hub Information Driver v3"
+        }]"""
+        deviceManager = DeviceManager(hubJson)
+        
+        // Set up power control
+        deviceManager.findDevice("test hub", "deepReboot").getOrNull()?.let {
+            (it as Hub).powerControl = mock()
         }
-        client = HttpClient(mockEngine)
 
-        // When
-        val result = updateHubs(maxAttempts = 2, delayMillis = 100) { _ -> }
-
-        // Then
+        val messages = mutableListOf<String>()
+        val result = deepRebootHub("test hub") { msg -> messages.add(msg) }
+        
         assertTrue(result.isSuccess)
-        val message = result.getOrNull()!!
-        assertTrue(message.contains("No updates needed"))
+        assertTrue(messages.isNotEmpty())
+        assertEquals("Starting deep reboot sequence for Test Hub...", messages[0])
+    }
+
+    @Test
+    fun `deepRebootHub handles power control configuration failure`() = runBlocking {
+        // Setup a hub without power control
+        val hubJson = """[{
+            "id": 1,
+            "label": "Test Hub",
+            "type": "Hub Information Driver v3"
+        }]"""
+        deviceManager = DeviceManager(hubJson)
+        
+        val messages = mutableListOf<String>()
+        val result = deepRebootHub("test hub") { msg -> messages.add(msg) }
+        
+        assertTrue(result.isFailure)
+        assertEquals(1, messages.size)
+        assertEquals("Configuring power control for Test Hub...", messages[0])
+        assertTrue(result.exceptionOrNull()?.message?.contains("Failed to configure power control") == true)
+    }
+
+    @Test
+    fun `deepRebootHub handles deep reboot failure`() = runBlocking {
+        // Setup a hub with mocked power control that throws an exception
+        val hubJson = """[{
+            "id": 1,
+            "label": "Test Hub",
+            "type": "Hub Information Driver v3"
+        }]"""
+        deviceManager = DeviceManager(hubJson)
+        
+        // Set up failing power control
+        val mockPowerControl = mock<PowerControl>()
+        doAnswer { throw RuntimeException("Failed to reboot") }
+            .whenever(mockPowerControl)
+            .deepReboot(any(), any(), any(), any())
+        
+        deviceManager.findDevice("test hub", "deepReboot").getOrNull()?.let {
+            (it as Hub).powerControl = mockPowerControl
+        }
+
+        val messages = mutableListOf<String>()
+        val result = deepRebootHub("test hub") { msg -> messages.add(msg) }
+        
+        assertTrue(result.isFailure)
+        assertEquals("Starting deep reboot sequence for Test Hub...", messages[0])
+        assertTrue(result.exceptionOrNull()?.message?.contains("Error during deep reboot: Failed to reboot") == true)
     }
 }

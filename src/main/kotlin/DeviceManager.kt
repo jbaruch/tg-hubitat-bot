@@ -5,11 +5,9 @@ import jbaru.ch.telegram.hubitat.model.Hub
 import kotlinx.serialization.json.Json
 
 class DeviceManager(deviceListJson: String) {
-
     private val deviceCache: MutableMap<String, Device> = mutableMapOf()
     private lateinit var devices: List<Device>
     private val allDeviceCommands: Set<String>
-
 
     init {
         refreshDevices(deviceListJson)
@@ -17,11 +15,9 @@ class DeviceManager(deviceListJson: String) {
     }
 
     fun refreshDevices(deviceListJson: String): Pair<Int, List<String>> {
-        val format = Json { ignoreUnknownKeys = true }
-        devices = format.decodeFromString<List<Device>>(deviceListJson)
-        deviceCache.clear()
-        val result: Pair<Int, List<String>> = Pair(devices.size, initializeCache(devices))
-        return result
+        devices = Json.decodeFromString<List<Device>>(deviceListJson)
+        val warnings = initializeCache(devices)
+        return Pair(devices.size, warnings)
     }
 
     fun isDeviceCommand(command: String): Boolean {
@@ -40,7 +36,7 @@ class DeviceManager(deviceListJson: String) {
             }
         }
 
-        return Result.failure(Exception("No device found for query: $name"))
+        return Result.failure(Exception("No device found for query: ${name}"))
     }
 
     fun <T : Device> findDevicesByType(type: Class<T>): List<T> {
@@ -104,56 +100,51 @@ class DeviceManager(deviceListJson: String) {
             var maxDeviceNameLength = 0
             var maxAliasesLength = 0
 
-            // Group aliases by device and find maximum lengths for this type
-            deviceCache.forEach { (alias, device) ->
-                if (devices.contains(device)) {
-                    deviceToAliases.getOrPut(device) { mutableListOf() }.add(alias)
-                    maxDeviceNameLength = maxOf(maxDeviceNameLength, device.label.length)
-                    maxAliasesLength = maxOf(maxAliasesLength, deviceToAliases[device]!!.joinToString(", ").length)
-                }
+            // Group aliases by device and find maximum lengths
+            devices.forEach { device ->
+                deviceToAliases[device] = mutableListOf(device.label)
+                maxDeviceNameLength = maxOf(maxDeviceNameLength, device.label.length)
+                maxAliasesLength = maxOf(maxAliasesLength, deviceToAliases[device]!!.joinToString(", ").length)
             }
 
-            // Ensure column headers don't get cut off
-            maxDeviceNameLength = maxOf(maxDeviceNameLength, "Device".length)
-            maxAliasesLength = maxOf(maxAliasesLength, "Aliases".length)
-
-            buildString {
-                appendLine("```")
-                appendLine("+" + "-".repeat(maxDeviceNameLength + 2) + "+" + "-".repeat(maxAliasesLength + 2) + "+")
-                appendLine("| ${"Device".padEnd(maxDeviceNameLength)} | ${"Aliases".padEnd(maxAliasesLength)} |")
-                appendLine("+" + "-".repeat(maxDeviceNameLength + 2) + "+" + "-".repeat(maxAliasesLength + 2) + "+")
-
-                deviceToAliases.forEach { (device, aliases) ->
-                    val aliasesString = aliases.joinToString(", ")
-                    appendLine("| ${device.label.padEnd(maxDeviceNameLength)} | ${aliasesString.padEnd(maxAliasesLength)} |")
-                }
-
-                appendLine("+" + "-".repeat(maxDeviceNameLength + 2) + "+" + "-".repeat(maxAliasesLength + 2) + "+")
-                appendLine("```")
+            // Build the table string
+            val tableBuilder = StringBuilder()
+            deviceToAliases.forEach { (device, aliases) ->
+                tableBuilder.appendLine("\\- ${device.label}")
             }
+
+            tableBuilder.toString().trim()
         }
     }
 
     override fun toString(): String {
-        return devices.size.toString()
+        return deviceCache.entries.joinToString("\n") { (key, device) -> "$key -> ${device.label}" }
     }
 
     private fun initializeCache(devices: List<Device>): List<String> {
-        val warnings: MutableList<String> = ArrayList()
-        val nameMatrix = DeviceAbbreviator()
+        deviceCache.clear()
+        val warnings = mutableListOf<String>()
+
+        // First, add each device with its full name and without "Light(s)" suffix
         for (device in devices) {
             val fullName = device.label.lowercase()
-            addToCache(fullName, device)
+            warnings.addAll(addToCache(fullName, device))
 
             // Add name without "Light" or "Lights" if applicable
             val nameWithoutLights = removeLightSuffix(fullName)
             if (nameWithoutLights != fullName) {
-                addToCache(nameWithoutLights, device)
+                warnings.addAll(addToCache(nameWithoutLights, device))
             }
+        }
 
+        // Then, add abbreviations
+        val nameMatrix = DeviceAbbreviator()
+        for (device in devices) {
+            val fullName = device.label.lowercase()
             nameMatrix.addName(fullName)
         }
         nameMatrix.abbreviate()
+
         for (device in devices) {
             val fullName = device.label.lowercase()
             val abbreviation = nameMatrix.getAbbreviation(fullName)
@@ -165,11 +156,12 @@ class DeviceManager(deviceListJson: String) {
                 println(message)
             }
         }
+
         return warnings
     }
 
     private fun addToCache(key: String, device: Device): List<String> {
-        val warnings: MutableList<String> = ArrayList()
+        val warnings = mutableListOf<String>()
         if (deviceCache.containsKey(key)) {
             val message = "WARNING Duplicate key found in cache: $key"
             warnings.add(message)

@@ -1,6 +1,6 @@
 @file:Suppress("unused")
 
-package jbaru.ch.telegram.hubitat.jbaru.ch.telegram.hubitat.model
+package jbaru.ch.telegram.hubitat.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -9,7 +9,7 @@ sealed class Device {
     abstract val id: Int
     abstract val label: String
     abstract val supportedOps: Map<String, Int>
-    abstract val attributes: Map<String, List<String>>
+    abstract val attributes: Map<String, List<String>?>
 
     @Serializable
     sealed class Actuator : Device() {
@@ -20,7 +20,7 @@ sealed class Device {
     @Serializable
     sealed class Button : Device() {
         override val supportedOps: Map<String, Int> = mapOf("doubleTap" to 1, "hold" to 1, "push" to 1, "release" to 1)
-        override val attributes: Map<String, List<String>> = emptyMap()
+        override val attributes: Map<String, List<String>?> = emptyMap()
     }
 
     @Serializable
@@ -83,3 +83,4 @@ sealed class Device {
     @SerialName("Room Lights Activator Shade")
     data class RoomLightsActivatorShade(override val id: Int, override val label: String) : Shade()
 }
+

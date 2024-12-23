@@ -36,8 +36,8 @@ tasks.test {
     useJUnitPlatform()
     environment("EWELINK_EMAIL", (project.findProperty("EWELINK_EMAIL") ?: "") as String)
     environment("EWELINK_PASSWORD", (project.findProperty("EWELINK_PASSWORD") ?: "") as String)
-
 }
+
 kotlin {
     jvmToolchain(21)
 }

@@ -11,11 +11,17 @@ class DeviceManager(deviceListJson: String) {
 
     init {
         refreshDevices(deviceListJson)
-        allDeviceCommands = devices.flatMap { it.supportedOps.keys }.toSet()
+        allDeviceCommands = devices.flatMap { it.supportedOps?.keys ?: emptySet() }.toSet()
     }
 
     fun refreshDevices(deviceListJson: String): Pair<Int, List<String>> {
-        devices = Json.decodeFromString<List<Device>>(deviceListJson)
+        val json = Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+            allowStructuredMapKeys = true
+            coerceInputValues = true
+        }
+        devices = json.decodeFromString<List<Device>>(deviceListJson)
         val warnings = initializeCache(devices)
         return Pair(devices.size, warnings)
     }

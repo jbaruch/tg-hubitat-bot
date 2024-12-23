@@ -19,27 +19,49 @@ import io.ktor.http.*
 import jbaru.ch.telegram.hubitat.model.Device
 import jbaru.ch.telegram.hubitat.model.Hub
 import jbaru.ch.telegram.hubitat.model.HubPowerManager
+import jbaru.ch.telegram.hubitat.model.RebootConfig
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
+import java.lang.System.getProperty
 import java.lang.System.getenv
 import kotlin.collections.component1
 import kotlin.collections.component2
 import kotlin.collections.set
 
-private val BOT_TOKEN = getenv("BOT_TOKEN") ?: throw IllegalStateException("BOT_TOKEN not set")
-private val MAKER_API_APP_ID = getenv("MAKER_API_APP_ID") ?: throw IllegalStateException("MAKER_API_APP_ID not set")
-private val MAKER_API_TOKEN = getenv("MAKER_API_TOKEN") ?: throw IllegalStateException("MAKER_API_TOKEN not set")
-internal val CHAT_ID = getenv("CHAT_ID") ?: throw IllegalStateException("CHAT_ID environment variable is not set")
-private val DEFAULT_HUB_IP = getenv("DEFAULT_HUB_IP") ?: "hubitat.local"
-private val EWELINK_EMAIL = getenv("EWELINK_EMAIL") ?: throw IllegalStateException("EWELINK_EMAIL not set")
-private val EWELINK_PASSWORD = getenv("EWELINK_PASSWORD") ?: throw IllegalStateException("EWELINK_PASSWORD not set")
+private val BOT_TOKEN = getenv("BOT_TOKEN")
+    ?: getProperty("BOT_TOKEN")
+    ?: throw IllegalStateException("BOT_TOKEN not set in environment variables or system properties")
+
+private val MAKER_API_APP_ID = getenv("MAKER_API_APP_ID")
+    ?: getProperty("MAKER_API_APP_ID")
+    ?: throw IllegalStateException("MAKER_API_APP_ID not set in environment variables or system properties")
+
+private val MAKER_API_TOKEN = getenv("MAKER_API_TOKEN")
+    ?: getProperty("MAKER_API_TOKEN")
+    ?: throw IllegalStateException("MAKER_API_TOKEN not set in environment variables or system properties")
+
+internal val CHAT_ID = getenv("CHAT_ID")
+    ?: getProperty("CHAT_ID")
+    ?: ""
+
+private val DEFAULT_HUB_IP = getenv("DEFAULT_HUB_IP")
+    ?: getProperty("DEFAULT_HUB_IP")
+    ?: "hubitat.local"
+
+private val EWELINK_EMAIL = getenv("EWELINK_EMAIL")
+    ?: getProperty("EWELINK_EMAIL")
+    ?: ""
+
+private val EWELINK_PASSWORD = getenv("EWELINK_PASSWORD")
+    ?: getProperty("EWELINK_PASSWORD")
+    ?: ""
 
 
 internal var hubs: List<Hub> = emptyList()
 
 internal var client = HttpClient(CIO)
 
-private lateinit var deviceManager: DeviceManager
+internal var deviceManager: DeviceManager? = null
 internal lateinit var bot: Bot
 
 fun main() {
@@ -49,20 +71,8 @@ fun main() {
     }
     hubs = runBlocking { initHubs() }
 
-    val eweLinkSession = EweLinkSession(
-        email = EWELINK_EMAIL, password = EWELINK_PASSWORD
-    )
-
-    val hubPowerManager = HubPowerManager(eweLinkSession)
-
-    // Configure power control for hubs
-    hubs.forEach { hub ->
-        try {
-            hubPowerManager.configureHubPower(hub)
-            println("Configured deep reboot capability for ${hub.label}")
-        } catch (e: IllegalStateException) {
-            println("Note: ${hub.label} will not have deep reboot capability: ${e.message}")
-        }
+    if(EWELINK_EMAIL != "") {
+        setupHubPowerManagement()
     }
 
     bot = bot {
@@ -103,7 +113,7 @@ fun main() {
                 )
             }
             command("refresh") {
-                val refreshResults = deviceManager.refreshDevices(getDevicesJson())
+                val refreshResults = deviceManager?.refreshDevices(getDevicesJson()) ?: throw IllegalStateException("deviceManager is null")
                 bot.sendMessage(
                     chatId = ChatId.fromId(message.chat.id),
                     text = "Refresh finished, ${refreshResults.first} devices loaded. Warnings: ${refreshResults.second}"
@@ -111,13 +121,13 @@ fun main() {
             }
             command("list") {
                 val chatId = ChatId.fromId(message.chat.id)
-                deviceManager.listByType().forEach { (type, table) ->
+                deviceManager?.listByType()?.forEach { (type, table) ->
                     bot.sendMessage(
                         chatId = chatId,
                         text = "*$type*:\n$table",
                         parseMode = MARKDOWN_V2
                     )
-                }
+                } ?: throw IllegalStateException("deviceManager is null")
             }
 
             command("deep_reboot") {
@@ -131,73 +141,33 @@ fun main() {
                 }
 
                 val hubName = message.text!!.split(" ")[1]
-                val hubResult = deviceManager.findDevice(hubName, "deepReboot")
-
-                when {
-                    hubResult.isFailure -> {
+                deepRebootHub(hubName) { msg ->
+                    bot.sendMessage(
+                        chatId = chatId,
+                        text = msg
+                    )
+                }.fold(
+                    onSuccess = { },
+                    onFailure = { error ->
+                        error.printStackTrace()
                         bot.sendMessage(
                             chatId = chatId,
-                            text = hubResult.exceptionOrNull()?.message ?: "Unknown error finding hub"
+                            text = error.message.toString()
                         )
-                        return@command
                     }
-                    hubResult.getOrNull() !is Hub -> {
-                        bot.sendMessage(
-                            chatId = chatId,
-                            text = "Device '${hubName}' is not a hub"
-                        )
-                        return@command
-                    }
-                }
-
-                val hub = hubResult.getOrNull() as Hub
-                if (hub.powerControl == null) {
-                    bot.sendMessage(
-                        chatId = chatId,
-                        text = "Hub ${hub.label} does not support deep reboot (no power control configured)"
-                    )
-                    return@command
-                }
-
-                try {
-                    bot.sendMessage(
-                        chatId = chatId,
-                        text = "Starting deep reboot sequence for ${hub.label}..."
-                    )
-
-                    runBlocking {
-                        hub.deepReboot(client) { progressMessage ->
-                            println(progressMessage)  // Console log
-                            bot.sendMessage(         // Bot message
-                                chatId = chatId,
-                                text = progressMessage
-                            )
-                        }
-                    }
-                } catch (e: Exception) {
-                    val errorMessage = when(e) {
-                        is UnsupportedOperationException -> e.message ?: "Operation not supported"
-                        else -> "Error during deep reboot: ${e.message}"
-                    }
-                    println("Deep reboot error for ${hub.label}: ${e.message}")
-                    e.printStackTrace()
-                    bot.sendMessage(
-                        chatId = chatId,
-                        text = errorMessage
-                    )
-                }
+                )
             }
 
             command("get_open_sensors") {
                 val openSensors =
-                    deviceManager.findDevicesByType(Device.ContactSensor::class.java).mapNotNull { sensor ->
+                    deviceManager?.findDevicesByType(Device.ContactSensor::class.java)?.mapNotNull { sensor ->
                             val currentValue = getDeviceAttribute(sensor, "contact")
                             if (currentValue == "open") {
                                 sensor.label
                             } else {
                                 null
                             }
-                        }.joinToString(separator = "\n")
+                        }?.joinToString(separator = "\n") ?: throw IllegalStateException("deviceManager is null")
 
                 val response = if (openSensors.isNotEmpty()) {
                     "Open Sensors:\n$openSensors"
@@ -210,14 +180,31 @@ fun main() {
         }
     }
 
-    println("Init successful, $deviceManager devices loaded, start polling")
+    println("Init successful, ${deviceManager?.let { it.listByType().values.sumOf { table -> table.lines().size } } ?: 0} devices loaded, start polling")
     if (CHAT_ID != "") {
         bot.sendMessage(
             chatId = ChatId.fromId(CHAT_ID.toLong()),
-            text = "Init successful, $deviceManager devices loaded, start polling"
+            text = "Init successful, ${deviceManager?.let { it.listByType().values.sumOf { table -> table.lines().size } } ?: 0} devices loaded, start polling"
         )
     }
     bot.startPolling()
+
+}
+
+private fun setupHubPowerManagement() {
+    val eweLinkSession = EweLinkSession(
+        email = EWELINK_EMAIL, password = EWELINK_PASSWORD
+    )
+    val hubPowerManager = HubPowerManager(eweLinkSession)
+    // Configure power control for hubs
+    hubs.forEach { hub ->
+        try {
+            hubPowerManager.configureHubPower(hub)
+            println("Configured deep reboot capability for ${hub.label}")
+        } catch (e: IllegalStateException) {
+            println("Note: ${hub.label} will not have deep reboot capability: ${e.message}")
+        }
+    }
 }
 
 fun String.snakeToCamelCase(): String {
@@ -244,7 +231,7 @@ suspend fun handleDeviceCommand(bot: Bot, message: Message) {
     val deviceName = parts[1]
     val args = parts.drop(2)
 
-    val result = deviceManager.findDevice(deviceName, camelCaseCommand).fold(onSuccess = { device ->
+    val result = deviceManager?.findDevice(deviceName, camelCaseCommand)?.fold(onSuccess = { device ->
         val argCount = device.supportedOps[camelCaseCommand]
         if (argCount == null) {
             "Command '/$snakeCaseCommand' is not supported by device '${device.label}'"
@@ -256,7 +243,7 @@ suspend fun handleDeviceCommand(bot: Bot, message: Message) {
     }, onFailure = {
         it.printStackTrace()
         it.message.toString()
-    })
+    }) ?: throw IllegalStateException("deviceManager is null")
 
     bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = result)
 }
@@ -385,7 +372,7 @@ suspend fun updateHubs(
 }
 
 private suspend fun initHubs(): List<Hub> {
-    val hubs = deviceManager.findDevicesByType(Hub::class.java)
+    val hubs = deviceManager?.findDevicesByType(Hub::class.java) ?: throw IllegalStateException("deviceManager is null")
     for (hub in hubs) {
         val json: Map<String, JsonElement> =
             Json.parseToJsonElement(client.get("http://${DEFAULT_HUB_IP}/apps/api/${MAKER_API_APP_ID}/devices/${hub.id}") {
@@ -404,6 +391,34 @@ private suspend fun initHubs(): List<Hub> {
 class DeviceCommandFilter : Filter {
     override fun Message.predicate(): Boolean {
         val command = text?.split(" ")?.firstOrNull()?.removePrefix("/")
-        return command != null && deviceManager.isDeviceCommand(command.snakeToCamelCase())
+        return command != null && deviceManager?.isDeviceCommand(command.snakeToCamelCase()) ?: false
+    }
+}
+
+suspend fun deepRebootHub(
+    hubName: String,
+    sendMessage: suspend (String) -> Unit = {},
+): Result<Unit> {
+    val hubResult = deviceManager?.findDevice(hubName, "deepReboot") ?: throw IllegalStateException("deviceManager is null")
+
+    return hubResult.mapCatching { device ->
+        if (device !is Hub) {
+            throw IllegalArgumentException("Device '${device.label}' is not a hub")
+        }
+
+        if (device.powerControl == null) {
+            sendMessage("Configuring power control for ${device.label}...")
+            throw IllegalStateException("Failed to configure power control for hub ${device.label}")
+        }
+
+        sendMessage("Starting deep reboot sequence for ${device.label}...")
+        device.deepReboot(
+            client,
+            { progressMessage ->
+                println(progressMessage)  // Console log
+                sendMessage(progressMessage)
+            },
+            config = RebootConfig()
+        )
     }
 }

@@ -102,6 +102,76 @@ object CommandHandlers {
         }
     }
     
+    suspend fun handleGetModeCommand(
+        networkClient: NetworkClient,
+        makerApiAppId: String,
+        makerApiToken: String,
+        hubIp: String
+    ): String {
+        return ModeOperations.getCurrentMode(
+            networkClient, makerApiAppId, makerApiToken, hubIp
+        ).fold(
+            onSuccess = { mode -> "Current mode: ${mode.name}" },
+            onFailure = { e -> "Error getting current mode: ${e.message}" }
+        )
+    }
+    
+    suspend fun handleListModesCommand(
+        networkClient: NetworkClient,
+        makerApiAppId: String,
+        makerApiToken: String,
+        hubIp: String
+    ): String {
+        return ModeOperations.getAllModes(
+            networkClient, makerApiAppId, makerApiToken, hubIp
+        ).fold(
+            onSuccess = { modes ->
+                val modeList = modes.joinToString("\n") { mode ->
+                    if (mode.active) {
+                        "• ${mode.name} (active)"
+                    } else {
+                        "• ${mode.name}"
+                    }
+                }
+                "Available modes:\n$modeList"
+            },
+            onFailure = { e -> "Error listing modes: ${e.message}" }
+        )
+    }
+    
+    suspend fun handleSetModeCommand(
+        message: Message,
+        networkClient: NetworkClient,
+        makerApiAppId: String,
+        makerApiToken: String,
+        hubIp: String
+    ): String {
+        val parts = message.text?.split(" ") ?: return "Please specify a mode name."
+        if (parts.size < 2) {
+            return "Please specify a mode name. Usage: /set_mode <mode_name>"
+        }
+        
+        val modeName = parts.drop(1).joinToString(" ")
+        
+        return ModeOperations.setMode(
+            networkClient, makerApiAppId, makerApiToken, hubIp, modeName
+        ).fold(
+            onSuccess = { successMessage -> "Mode changed to $modeName successfully." },
+            onFailure = { e ->
+                if (e.message?.contains("Mode not found") == true) {
+                    // Get available modes to suggest
+                    val modesResult = ModeOperations.getAllModes(
+                        networkClient, makerApiAppId, makerApiToken, hubIp
+                    )
+                    val availableModes = modesResult.getOrNull()?.joinToString(", ") { it.name } ?: ""
+                    "Mode not found: $modeName. Available modes: $availableModes"
+                } else {
+                    "Error setting mode: ${e.message}"
+                }
+            }
+        )
+    }
+    
     private suspend fun runDeviceCommand(
         device: Device,
         command: String,

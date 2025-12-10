@@ -1,7 +1,7 @@
 plugins {
-    kotlin("jvm") version "2.2.21"
-    kotlin("plugin.serialization") version "2.2.21"
-    id("com.google.cloud.tools.jib") version "3.4.4"
+    kotlin("jvm") version "2.3.0-RC3"
+    kotlin("plugin.serialization") version "2.3.0-RC3"
+    id("com.google.cloud.tools.jib") version "3.5.1"
     application
     jacoco
 }
@@ -11,6 +11,7 @@ version = "1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
+    maven("https://maven.pkg.jetbrains.space/kotlin/p/kotlin/dev")
     maven("https://jitpack.io")
 }
 
@@ -45,7 +46,7 @@ tasks.test {
     useJUnitPlatform()
 }
 kotlin {
-    jvmToolchain(23)
+    jvmToolchain(25)
 }
 
 application {
@@ -90,6 +91,9 @@ tasks.check {
 }
 
 jib {
+    from {
+        image = "eclipse-temurin:25-jre"
+    }
     to {
         image = "jbaru.ch/tg-hubitat-bot"
     }

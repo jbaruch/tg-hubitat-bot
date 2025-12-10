@@ -130,6 +130,36 @@ fun main() {
                 }
                 bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = response)
             }
+            
+            command("get_mode") {
+                val result = runBlocking {
+                    CommandHandlers.handleGetModeCommand(
+                        networkClient, config.makerApiAppId,
+                        config.makerApiToken, config.defaultHubIp
+                    )
+                }
+                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = result)
+            }
+            
+            command("list_modes") {
+                val result = runBlocking {
+                    CommandHandlers.handleListModesCommand(
+                        networkClient, config.makerApiAppId,
+                        config.makerApiToken, config.defaultHubIp
+                    )
+                }
+                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = result)
+            }
+            
+            command("set_mode") {
+                val result = runBlocking {
+                    CommandHandlers.handleSetModeCommand(
+                        message, networkClient, config.makerApiAppId,
+                        config.makerApiToken, config.defaultHubIp
+                    )
+                }
+                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = result)
+            }
         }
     }
 

@@ -27,40 +27,65 @@ import com.github.kotlintelegrambot.extensions.filters.Filter
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 
-private val BOT_TOKEN = getenv("BOT_TOKEN") ?: throw IllegalStateException("BOT_TOKEN not set")
-private val MAKER_API_APP_ID = getenv("MAKER_API_APP_ID") ?: throw IllegalStateException("MAKER_API_APP_ID not set")
-private val MAKER_API_TOKEN = getenv("MAKER_API_TOKEN") ?: throw IllegalStateException("MAKER_API_TOKEN not set")
-private val CHAT_ID = getenv("CHAT_ID") ?: ""
-private val DEFAULT_HUB_IP = getenv("DEFAULT_HUB_IP") ?: "hubitat.local"
-
+private lateinit var config: BotConfiguration
 private lateinit var hubs: List<Device.Hub>
-
 private val client = HttpClient(CIO)
-
+private lateinit var networkClient: NetworkClient
 private lateinit var deviceManager: DeviceManager
 
 fun main() {
+    config = BotConfiguration.fromEnvironment()
+    networkClient = KtorNetworkClient(client)
 
     deviceManager = runBlocking {
         DeviceManager(getDevicesJson())
     }
-    hubs = runBlocking { initHubs() }
+    hubs = runBlocking { 
+        HubOperations.initializeHubs(
+            deviceManager, networkClient, config.defaultHubIp,
+            config.makerApiAppId, config.makerApiToken
+        )
+    }
 
     val bot = bot {
-        token = BOT_TOKEN
+        token = config.botToken
         logLevel = LogLevel.Network.Basic
 
         dispatch {
 
             message(DeviceCommandFilter()) {
-                handleDeviceCommand(bot, message)
+                val result = runBlocking {
+                    CommandHandlers.handleDeviceCommand(
+                        bot, message, deviceManager, networkClient,
+                        config.makerApiAppId, config.makerApiToken, config.defaultHubIp
+                    )
+                }
+                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = result)
             }
 
             command("cancel_alerts") {
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = runCommandOnHsm("cancelAlerts"))
+                val result = runBlocking {
+                    CommandHandlers.handleCancelAlertsCommand(
+                        networkClient, config.makerApiAppId, config.makerApiToken, config.defaultHubIp
+                    )
+                }
+                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = result)
             }
+            
             command("update") {
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = updateHubs().fold(
+                val result = runBlocking {
+                    HubOperations.updateHubsWithPolling(
+                        hubs,
+                        networkClient,
+                        progressCallback = { progressMessage ->
+                            bot.sendMessage(
+                                chatId = ChatId.fromId(message.chat.id),
+                                text = progressMessage
+                            )
+                        }
+                    )
+                }
+                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = result.fold(
                     onSuccess = { it },
                     onFailure = {
                         it.printStackTrace()
@@ -68,16 +93,26 @@ fun main() {
                     }
                 ))
             }
+            
             command("refresh") {
-                val refreshResults = deviceManager.refreshDevices(getDevicesJson())
+                val refreshResults = runBlocking {
+                    CommandHandlers.handleRefreshCommand(
+                        deviceManager, networkClient,
+                        config.makerApiAppId, config.makerApiToken, config.defaultHubIp
+                    )
+                }
                 bot.sendMessage(
                     chatId = ChatId.fromId(message.chat.id),
                     text = "Refresh finished, ${refreshResults.first} devices loaded. Warnings: ${refreshResults.second}"
                 )
             }
+            
             command("list") {
                 val chatId = ChatId.fromId(message.chat.id)
-                deviceManager.listByType().forEach { (type, table) ->
+                val deviceLists = runBlocking {
+                    CommandHandlers.handleListCommand(deviceManager)
+                }
+                deviceLists.forEach { (type, table) ->
                     bot.sendMessage(
                         chatId = chatId,
                         text = "*$type*:\n$table",
@@ -87,159 +122,32 @@ fun main() {
             }
 
             command("get_open_sensors") {
-                val openSensors = deviceManager.findDevicesByType(Device.ContactSensor::class.java)
-                    .mapNotNull { sensor ->
-                        val currentValue = getDeviceAttribute(sensor, "contact")
-                        if (currentValue == "open") {
-                            sensor.label
-                        } else {
-                            null
-                        }
-                    }.joinToString(separator = "\n")
-
-                val response = if (openSensors.isNotEmpty()) {
-                    "Open Sensors:\n$openSensors"
-                } else {
-                    "No open sensors found."
+                val response = runBlocking {
+                    CommandHandlers.handleGetOpenSensorsCommand(
+                        deviceManager, networkClient,
+                        config.makerApiAppId, config.makerApiToken, config.defaultHubIp
+                    )
                 }
-
                 bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = response)
             }
         }
     }
 
     println("Init successful, $deviceManager devices loaded, start polling")
-    if (CHAT_ID != "") {
+    if (config.chatId.isNotEmpty()) {
         bot.sendMessage(
-            chatId = ChatId.fromId(CHAT_ID.toLong()),
+            chatId = ChatId.fromId(config.chatId.toLong()),
             text = "Init successful, $deviceManager devices loaded, start polling"
         )
     }
     bot.startPolling()
 }
 
-fun String.snakeToCamelCase(): String {
-    return split("_").mapIndexed { index, s ->
-        if (index == 0) s else s.replaceFirstChar(Char::titlecase)
-    }.joinToString("")
-}
-
 private suspend fun getDevicesJson(): String =
-    client.get("http://${DEFAULT_HUB_IP}/apps/api/${MAKER_API_APP_ID}/devices") {
-        parameter("access_token", MAKER_API_TOKEN)
-    }.body()
-
-
-suspend fun handleDeviceCommand(bot: Bot, message: Message) {
-    val parts = message.text?.split(" ") ?: return
-    if (parts.size < 2) {
-        bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Please specify a device name for the command.")
-        return
-    }
-
-    val snakeCaseCommand = parts[0].removePrefix("/")
-    val camelCaseCommand = snakeCaseCommand.snakeToCamelCase()
-    val deviceName = parts[1]
-    val args = parts.drop(2)
-
-    val result = deviceManager.findDevice(deviceName, camelCaseCommand).fold(
-        onSuccess = { device ->
-            val argCount = device.supportedOps[camelCaseCommand]
-            if (argCount == null) {
-                "Command '/$snakeCaseCommand' is not supported by device '${device.label}'"
-            } else if (args.size != argCount) {
-                "Invalid number of arguments for /$snakeCaseCommand. Expected $argCount argument(s)."
-            } else {
-                runDeviceCommand(device, camelCaseCommand, args)
-            }
-        },
-        onFailure = {
-            it.printStackTrace()
-            it.message.toString()
-        }
+    networkClient.getBody(
+        "http://${config.defaultHubIp}/apps/api/${config.makerApiAppId}/devices",
+        mapOf("access_token" to config.makerApiToken)
     )
-
-    bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = result)
-}
-
-
-suspend fun runDeviceQuery(device: Device, path: String, args: List<String> = emptyList()): HttpResponse {
-    val fullPath = buildString {
-        append("/apps/api/${MAKER_API_APP_ID}/devices/${device.id}/$path")
-        if (args.isNotEmpty()) {
-            append("/${args.joinToString("/")}")
-        }
-    }
-
-    return client.get("http://${DEFAULT_HUB_IP}$fullPath") {
-        parameter("access_token", MAKER_API_TOKEN)
-    }
-}
-
-suspend fun runDeviceCommand(device: Device, command: String, args: List<String>): String {
-    val response = runDeviceQuery(device, command, args)
-    return response.status.description
-}
-
-suspend fun getDeviceAttribute(device: Device, attribute: String): String {
-    val response = runDeviceQuery(device, "attribute/$attribute")
-    val body = response.bodyAsText()
-    val json = Json.parseToJsonElement(body).jsonObject
-    return json["value"]?.jsonPrimitive?.content ?: "Unknown"
-}
-
-
-
-suspend fun runCommandOnHsm(command: String): String {
-    return client.get("http://${DEFAULT_HUB_IP}/apps/api/${MAKER_API_APP_ID}/hsm/$command") {
-        parameter("access_token", MAKER_API_TOKEN)
-    }.status.description
-}
-
-suspend fun updateHubs(): Result<String> {
-    val statusMap = mutableMapOf<String, HttpStatusCode>()
-
-    for (hub in hubs) {
-        try {
-            val response = client.get("http://${hub.ip}/management/firmwareUpdate") {
-                parameter("token", hub.managementToken)
-            }
-            statusMap[hub.label] = response.status
-        } catch (_: Exception) {
-            statusMap[hub.label] = HttpStatusCode.InternalServerError
-        }
-    }
-    val failures = statusMap.filterValues { it != HttpStatusCode.OK }
-    return if (failures.isEmpty()) {
-        Result.success("All hub updates initialized successfully.")
-    } else {
-        val failureMessages = failures.entries.joinToString("\n") { (name, status) ->
-            "Failed to update hub $name Status: $status"
-        }
-        val successMessages = statusMap.filterValues { it == HttpStatusCode.OK }
-            .entries.joinToString("\n") { (name, _) ->
-                "Successfully issued update request to hub $name"
-            }
-        Result.failure(Exception("$failureMessages\n$successMessages"))
-    }
-}
-
-private suspend fun initHubs(): List<Device.Hub> {
-    val hubs = deviceManager.findDevicesByType(Device.Hub::class.java)
-    for (hub in hubs) {
-        val json: Map<String, JsonElement> =
-            Json.parseToJsonElement(client.get("http://${DEFAULT_HUB_IP}/apps/api/${MAKER_API_APP_ID}/devices/${hub.id}") {
-                parameter("access_token", MAKER_API_TOKEN)
-            }.body<String>()).jsonObject
-
-        val ip = (json["attributes"] as JsonArray).find {
-            it.jsonObject["name"]!!.jsonPrimitive.content == "localIP"
-        }!!.jsonObject["currentValue"]!!.jsonPrimitive.content
-        hub.ip = ip
-        hub.managementToken = client.get("http://${ip}/hub/advanced/getManagementToken").body()
-    }
-    return hubs
-}
 
 
 class DeviceCommandFilter : Filter {

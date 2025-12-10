@@ -88,8 +88,16 @@ sealed class Device {
     data class ZoozDimmer(override val id: Int, override val label: String) : Actuator()
 
     @Serializable
+    @SerialName("Zooz ZEN Dimmer Advanced")
+    data class ZoozZenDimmerAdvanced(override val id: Int, override val label: String) : Actuator()
+
+    @Serializable
     @SerialName("Zooz Zen76 S2 Switch")
     data class ZoozSwitch(override val id: Int, override val label: String) : Actuator()
+
+    @Serializable
+    @SerialName("Zooz ZEN Switch Advanced")
+    data class ZoozZenSwitchAdvanced(override val id: Int, override val label: String) : Actuator()
 
     @Serializable
     @SerialName("Room Lights Activator Shade")

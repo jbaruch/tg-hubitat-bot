@@ -62,16 +62,37 @@ object HubOperations {
     
     suspend fun getHubVersions(
         hub: Device.Hub,
-        networkClient: NetworkClient
+        networkClient: NetworkClient,
+        hubIp: String,
+        makerApiAppId: String,
+        makerApiToken: String
     ): Pair<String, String> {
-        val json = Json.parseToJsonElement(
-            networkClient.getBody("http://${hub.ip}/hub/advanced/hubInfo")
-        ).jsonObject
+        // Query the Hub Information Driver device through Maker API
+        val endpoint = "http://${hubIp}/apps/api/${makerApiAppId}/devices/${hub.id}"
+        val responseBody = networkClient.getBody(endpoint, mapOf("access_token" to makerApiToken))
         
-        val currentVersion = json["firmwareVersions"]?.jsonObject?.get("current")?.jsonPrimitive?.content ?: ""
-        val availableVersion = json["firmwareVersions"]?.jsonObject?.get("available")?.jsonPrimitive?.content ?: ""
-        
-        return Pair(currentVersion, availableVersion)
+        try {
+            val json = Json.parseToJsonElement(responseBody).jsonObject
+            val attributes = json["attributes"] as? JsonArray
+            
+            // Hub Information Driver v3 exposes these attributes
+            val currentVersion = attributes?.find {
+                it.jsonObject["name"]?.jsonPrimitive?.content == "firmwareVersionString"
+            }?.jsonObject?.get("currentValue")?.jsonPrimitive?.content ?: ""
+            
+            val availableVersion = attributes?.find {
+                it.jsonObject["name"]?.jsonPrimitive?.content == "hubUpdateVersion"
+            }?.jsonObject?.get("currentValue")?.jsonPrimitive?.content ?: ""
+            
+            return Pair(currentVersion, availableVersion)
+        } catch (e: Exception) {
+            val preview = if (responseBody.length > 200) responseBody.take(200) + "..." else responseBody
+            throw Exception(
+                "Failed to parse hub info response for hub '${hub.label}' from endpoint '$endpoint': ${e.message}\n" +
+                "Response preview: $preview",
+                e
+            )
+        }
     }
     
     suspend fun updateHubs(
@@ -109,6 +130,9 @@ object HubOperations {
     suspend fun updateHubsWithPolling(
         hubs: List<Device.Hub>,
         networkClient: NetworkClient,
+        hubIp: String,
+        makerApiAppId: String,
+        makerApiToken: String,
         maxAttempts: Int = 20,
         delayMillis: Long = 30000,
         progressCallback: suspend (String) -> Unit
@@ -117,7 +141,7 @@ object HubOperations {
         val versionInfo = mutableMapOf<String, HubVersionInfo>()
         for (hub in hubs) {
             try {
-                val (current, available) = getHubVersions(hub, networkClient)
+                val (current, available) = getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
                 versionInfo[hub.label] = HubVersionInfo(hub.label, current, available)
             } catch (e: Exception) {
                 return Result.failure(Exception("Failed to get version info for hub ${hub.label}: ${e.message}"))
@@ -170,7 +194,7 @@ object HubOperations {
             for (hubLabel in currentProgress.inProgressHubs) {
                 val hub = hubs.find { it.label == hubLabel } ?: continue
                 try {
-                    val (newCurrent, _) = getHubVersions(hub, networkClient)
+                    val (newCurrent, _) = getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
                     val originalVersion = versionInfo[hubLabel]!!.currentVersion
                     val targetVersion = versionInfo[hubLabel]!!.availableVersion
                     

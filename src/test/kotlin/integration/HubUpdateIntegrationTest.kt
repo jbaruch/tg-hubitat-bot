@@ -21,17 +21,17 @@ class HubUpdateIntegrationTest : FunSpec({
         var callCount = 0
         val mockEngine = MockEngine { request ->
             when {
-                request.url.encodedPath.contains("/hub/advanced/hubInfo") -> {
-                    // Hub version endpoint - return different versions on subsequent calls
+                request.url.encodedPath.contains("/apps/api/") && request.url.encodedPath.contains("/devices/1") -> {
+                    // Maker API device endpoint - return different versions on subsequent calls
                     callCount++
                     val currentVersion = if (callCount <= 2) "2.3.9.183" else "2.3.9.184"
                     respond(
-                        content = ByteReadChannel("""{"firmwareVersions":{"current":"$currentVersion","available":"2.3.9.184"}}"""),
+                        content = ByteReadChannel("""{"attributes":[{"name":"firmwareVersionString","currentValue":"$currentVersion"},{"name":"hubUpdateVersion","currentValue":"2.3.9.184"}]}"""),
                         status = HttpStatusCode.OK,
                         headers = headersOf(HttpHeaders.ContentType, "application/json")
                     )
                 }
-                request.url.encodedPath.contains("/hub/advanced/updateFirmware") -> {
+                request.url.encodedPath.contains("/management/firmwareUpdate") -> {
                     // Update firmware endpoint
                     respond(
                         content = ByteReadChannel(""),
@@ -62,6 +62,9 @@ class HubUpdateIntegrationTest : FunSpec({
         val result = HubOperations.updateHubsWithPolling(
             hubs = listOf(hub),
             networkClient = networkClient,
+            hubIp = "hubitat.local",
+            makerApiAppId = "test-app",
+            makerApiToken = "test-token",
             maxAttempts = 3,
             delayMillis = 100,
             progressCallback = { message ->
@@ -77,10 +80,10 @@ class HubUpdateIntegrationTest : FunSpec({
     test("hub update flow with already up-to-date hubs") {
         val mockEngine = MockEngine { request ->
             when {
-                request.url.encodedPath.contains("/hub/advanced/hubInfo") -> {
-                    // Hub already up to date
+                request.url.encodedPath.contains("/apps/api/") && request.url.encodedPath.contains("/devices/1") -> {
+                    // Maker API device endpoint - hub already up to date
                     respond(
-                        content = ByteReadChannel("""{"firmwareVersions":{"current":"2.3.9.184","available":"2.3.9.184"}}"""),
+                        content = ByteReadChannel("""{"attributes":[{"name":"firmwareVersionString","currentValue":"2.3.9.184"},{"name":"hubUpdateVersion","currentValue":"2.3.9.184"}]}"""),
                         status = HttpStatusCode.OK,
                         headers = headersOf(HttpHeaders.ContentType, "application/json")
                     )
@@ -109,6 +112,9 @@ class HubUpdateIntegrationTest : FunSpec({
         val result = HubOperations.updateHubsWithPolling(
             hubs = listOf(hub),
             networkClient = networkClient,
+            hubIp = "hubitat.local",
+            makerApiAppId = "test-app",
+            makerApiToken = "test-token",
             maxAttempts = 2,
             delayMillis = 100,
             progressCallback = { message ->
@@ -141,6 +147,9 @@ class HubUpdateIntegrationTest : FunSpec({
         val result = HubOperations.updateHubsWithPolling(
             hubs = listOf(hub),
             networkClient = networkClient,
+            hubIp = "hubitat.local",
+            makerApiAppId = "test-app",
+            makerApiToken = "test-token",
             maxAttempts = 1,
             delayMillis = 100,
             progressCallback = { }

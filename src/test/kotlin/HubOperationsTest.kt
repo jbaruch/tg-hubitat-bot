@@ -1,12 +1,17 @@
 package jbaru.ch.telegram.hubitat
 
 import io.kotest.core.spec.style.FunSpec
+import io.kotest.core.Tag
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.HttpStatusCode
 import jbaru.ch.telegram.hubitat.model.Device
 import org.mockito.kotlin.*
+
+object RealHubTest : Tag()
 
 class HubOperationsTest : FunSpec({
     
@@ -163,38 +168,42 @@ class HubOperationsTest : FunSpec({
     }
     
     context("getHubVersions") {
-        test("should retrieve current and available firmware versions") {
+        test("should retrieve current and available firmware versions from Maker API") {
             val hub = Device.Hub(1, "Test Hub")
-            hub.ip = "192.168.1.100"
             
-            val hubInfoJson = """
+            val makerApiResponse = """
                 {
-                    "firmwareVersions": {
-                        "current": "2.3.4.150",
-                        "available": "2.3.5.160"
-                    }
+                    "attributes": [
+                        {"name": "firmwareVersionString", "currentValue": "2.3.4.150"},
+                        {"name": "hubUpdateVersion", "currentValue": "2.3.5.160"}
+                    ]
                 }
             """.trimIndent()
             
-            whenever(networkClient.getBody(eq("http://192.168.1.100/hub/advanced/hubInfo"), any()))
-                .thenReturn(hubInfoJson)
+            whenever(networkClient.getBody(eq("http://hubitat.local/apps/api/test-app-id/devices/1"), any()))
+                .thenReturn(makerApiResponse)
             
-            val (current, available) = HubOperations.getHubVersions(hub, networkClient)
+            val (current, available) = HubOperations.getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
             
             current shouldBe "2.3.4.150"
             available shouldBe "2.3.5.160"
         }
         
-        test("should handle malformed JSON response") {
+        test("should handle response with missing firmware attributes") {
             val hub = Device.Hub(1, "Test Hub")
-            hub.ip = "192.168.1.100"
             
-            val malformedJson = """{"invalid": "json"}"""
+            val makerApiResponse = """
+                {
+                    "attributes": [
+                        {"name": "someOtherAttribute", "currentValue": "value"}
+                    ]
+                }
+            """.trimIndent()
             
-            whenever(networkClient.getBody(eq("http://192.168.1.100/hub/advanced/hubInfo"), any()))
-                .thenReturn(malformedJson)
+            whenever(networkClient.getBody(eq("http://hubitat.local/apps/api/test-app-id/devices/1"), any()))
+                .thenReturn(makerApiResponse)
             
-            val (current, available) = HubOperations.getHubVersions(hub, networkClient)
+            val (current, available) = HubOperations.getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
             
             current shouldBe ""
             available shouldBe ""
@@ -202,16 +211,64 @@ class HubOperationsTest : FunSpec({
         
         test("should handle network error") {
             val hub = Device.Hub(1, "Test Hub")
-            hub.ip = "192.168.1.100"
             
-            whenever(networkClient.getBody(eq("http://192.168.1.100/hub/advanced/hubInfo"), any()))
+            whenever(networkClient.getBody(eq("http://hubitat.local/apps/api/test-app-id/devices/1"), any()))
                 .thenThrow(RuntimeException("Network error"))
             
             try {
-                HubOperations.getHubVersions(hub, networkClient)
+                HubOperations.getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
                 throw AssertionError("Expected exception to be thrown")
             } catch (e: RuntimeException) {
                 e.message shouldContain "Network error"
+            }
+        }
+        
+        test("should provide diagnostic info when receiving malformed JSON") {
+            val hub = Device.Hub(1, "Test Hub")
+            
+            val malformedJson = """{"invalid": "json" missing bracket"""
+            
+            whenever(networkClient.getBody(eq("http://hubitat.local/apps/api/test-app-id/devices/1"), any()))
+                .thenReturn(malformedJson)
+            
+            try {
+                HubOperations.getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
+                throw AssertionError("Expected exception to be thrown")
+            } catch (e: Exception) {
+                e.message shouldContain "Test Hub"
+                e.message shouldContain "http://hubitat.local/apps/api/test-app-id/devices/1"
+            }
+        }
+        
+        test("should handle empty response body") {
+            val hub = Device.Hub(1, "Test Hub")
+            
+            whenever(networkClient.getBody(eq("http://hubitat.local/apps/api/test-app-id/devices/1"), any()))
+                .thenReturn("")
+            
+            try {
+                HubOperations.getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
+                throw AssertionError("Expected exception to be thrown")
+            } catch (e: Exception) {
+                e.message shouldContain "Test Hub"
+                e.message shouldContain "http://hubitat.local/apps/api/test-app-id/devices/1"
+            }
+        }
+        
+        test("should truncate long response preview to 200 characters") {
+            val hub = Device.Hub(1, "Test Hub")
+            
+            val longResponse = "x".repeat(500)
+            
+            whenever(networkClient.getBody(eq("http://hubitat.local/apps/api/test-app-id/devices/1"), any()))
+                .thenReturn(longResponse)
+            
+            try {
+                HubOperations.getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
+                throw AssertionError("Expected exception to be thrown")
+            } catch (e: Exception) {
+                e.message shouldContain "..."
+                e.message shouldContain "Response preview:"
             }
         }
     }
@@ -222,22 +279,25 @@ class HubOperationsTest : FunSpec({
             hub1.ip = "192.168.1.100"
             hub1.managementToken = "token1"
             
-            val hubInfoJson = """
+            val makerApiResponse = """
                 {
-                    "firmwareVersions": {
-                        "current": "2.3.4.150",
-                        "available": "2.3.4.150"
-                    }
+                    "attributes": [
+                        {"name": "firmwareVersionString", "currentValue": "2.3.4.150"},
+                        {"name": "hubUpdateVersion", "currentValue": "2.3.4.150"}
+                    ]
                 }
             """.trimIndent()
             
-            whenever(networkClient.getBody(eq("http://192.168.1.100/hub/advanced/hubInfo"), any()))
-                .thenReturn(hubInfoJson)
+            whenever(networkClient.getBody(eq("http://hubitat.local/apps/api/test-app-id/devices/1"), any()))
+                .thenReturn(makerApiResponse)
             
             val messages = mutableListOf<String>()
             val result = HubOperations.updateHubsWithPolling(
                 listOf(hub1),
                 networkClient,
+                hubIp,
+                makerApiAppId,
+                makerApiToken,
                 maxAttempts = 5,
                 delayMillis = 100
             ) { messages.add(it) }
@@ -252,30 +312,30 @@ class HubOperationsTest : FunSpec({
             hub1.ip = "192.168.1.100"
             hub1.managementToken = "token1"
             
-            val beforeUpdateJson = """
+            val beforeUpdateResponse = """
                 {
-                    "firmwareVersions": {
-                        "current": "2.3.4.150",
-                        "available": "2.3.5.160"
-                    }
+                    "attributes": [
+                        {"name": "firmwareVersionString", "currentValue": "2.3.4.150"},
+                        {"name": "hubUpdateVersion", "currentValue": "2.3.5.160"}
+                    ]
                 }
             """.trimIndent()
             
-            val afterUpdateJson = """
+            val afterUpdateResponse = """
                 {
-                    "firmwareVersions": {
-                        "current": "2.3.5.160",
-                        "available": "2.3.5.160"
-                    }
+                    "attributes": [
+                        {"name": "firmwareVersionString", "currentValue": "2.3.5.160"},
+                        {"name": "hubUpdateVersion", "currentValue": "2.3.5.160"}
+                    ]
                 }
             """.trimIndent()
             
             val mockResponse: HttpResponse = mock()
             whenever(mockResponse.status).thenReturn(HttpStatusCode.OK)
             
-            whenever(networkClient.getBody(eq("http://192.168.1.100/hub/advanced/hubInfo"), any()))
-                .thenReturn(beforeUpdateJson)
-                .thenReturn(afterUpdateJson)
+            whenever(networkClient.getBody(eq("http://hubitat.local/apps/api/test-app-id/devices/1"), any()))
+                .thenReturn(beforeUpdateResponse)
+                .thenReturn(afterUpdateResponse)
             
             whenever(networkClient.get(argThat { contains("/management/firmwareUpdate") }, any()))
                 .thenReturn(mockResponse)
@@ -284,6 +344,9 @@ class HubOperationsTest : FunSpec({
             val result = HubOperations.updateHubsWithPolling(
                 listOf(hub1),
                 networkClient,
+                hubIp,
+                makerApiAppId,
+                makerApiToken,
                 maxAttempts = 5,
                 delayMillis = 100
             ) { messages.add(it) }
@@ -298,20 +361,20 @@ class HubOperationsTest : FunSpec({
             hub1.ip = "192.168.1.100"
             hub1.managementToken = "token1"
             
-            val hubInfoJson = """
+            val makerApiResponse = """
                 {
-                    "firmwareVersions": {
-                        "current": "2.3.4.150",
-                        "available": "2.3.5.160"
-                    }
+                    "attributes": [
+                        {"name": "firmwareVersionString", "currentValue": "2.3.4.150"},
+                        {"name": "hubUpdateVersion", "currentValue": "2.3.5.160"}
+                    ]
                 }
             """.trimIndent()
             
             val mockResponse: HttpResponse = mock()
             whenever(mockResponse.status).thenReturn(HttpStatusCode.OK)
             
-            whenever(networkClient.getBody(eq("http://192.168.1.100/hub/advanced/hubInfo"), any()))
-                .thenReturn(hubInfoJson)
+            whenever(networkClient.getBody(eq("http://hubitat.local/apps/api/test-app-id/devices/1"), any()))
+                .thenReturn(makerApiResponse)
             
             whenever(networkClient.get(argThat { contains("/management/firmwareUpdate") }, any()))
                 .thenReturn(mockResponse)
@@ -320,6 +383,9 @@ class HubOperationsTest : FunSpec({
             val result = HubOperations.updateHubsWithPolling(
                 listOf(hub1),
                 networkClient,
+                hubIp,
+                makerApiAppId,
+                makerApiToken,
                 maxAttempts = 2,
                 delayMillis = 100
             ) { messages.add(it) }
@@ -334,30 +400,30 @@ class HubOperationsTest : FunSpec({
             hub1.ip = "192.168.1.100"
             hub1.managementToken = "token1"
             
-            val beforeUpdateJson = """
+            val beforeUpdateResponse = """
                 {
-                    "firmwareVersions": {
-                        "current": "2.3.4.150",
-                        "available": "2.3.5.160"
-                    }
+                    "attributes": [
+                        {"name": "firmwareVersionString", "currentValue": "2.3.4.150"},
+                        {"name": "hubUpdateVersion", "currentValue": "2.3.5.160"}
+                    ]
                 }
             """.trimIndent()
             
-            val afterUpdateJson = """
+            val afterUpdateResponse = """
                 {
-                    "firmwareVersions": {
-                        "current": "2.3.5.160",
-                        "available": "2.3.5.160"
-                    }
+                    "attributes": [
+                        {"name": "firmwareVersionString", "currentValue": "2.3.5.160"},
+                        {"name": "hubUpdateVersion", "currentValue": "2.3.5.160"}
+                    ]
                 }
             """.trimIndent()
             
             val mockResponse: HttpResponse = mock()
             whenever(mockResponse.status).thenReturn(HttpStatusCode.OK)
             
-            whenever(networkClient.getBody(eq("http://192.168.1.100/hub/advanced/hubInfo"), any()))
-                .thenReturn(beforeUpdateJson)
-                .thenReturn(afterUpdateJson)
+            whenever(networkClient.getBody(eq("http://hubitat.local/apps/api/test-app-id/devices/1"), any()))
+                .thenReturn(beforeUpdateResponse)
+                .thenReturn(afterUpdateResponse)
             
             whenever(networkClient.get(argThat { contains("/management/firmwareUpdate") }, any()))
                 .thenReturn(mockResponse)
@@ -366,6 +432,9 @@ class HubOperationsTest : FunSpec({
             HubOperations.updateHubsWithPolling(
                 listOf(hub1),
                 networkClient,
+                hubIp,
+                makerApiAppId,
+                makerApiToken,
                 maxAttempts = 5,
                 delayMillis = 100
             ) { messages.add(it) }
@@ -380,30 +449,30 @@ class HubOperationsTest : FunSpec({
             hub1.ip = "192.168.1.100"
             hub1.managementToken = "token1"
             
-            val beforeUpdateJson = """
+            val beforeUpdateResponse = """
                 {
-                    "firmwareVersions": {
-                        "current": "2.3.4.150",
-                        "available": "2.3.5.160"
-                    }
+                    "attributes": [
+                        {"name": "firmwareVersionString", "currentValue": "2.3.4.150"},
+                        {"name": "hubUpdateVersion", "currentValue": "2.3.5.160"}
+                    ]
                 }
             """.trimIndent()
             
-            val afterUpdateJson = """
+            val afterUpdateResponse = """
                 {
-                    "firmwareVersions": {
-                        "current": "2.3.5.160",
-                        "available": "2.3.5.160"
-                    }
+                    "attributes": [
+                        {"name": "firmwareVersionString", "currentValue": "2.3.5.160"},
+                        {"name": "hubUpdateVersion", "currentValue": "2.3.5.160"}
+                    ]
                 }
             """.trimIndent()
             
             val mockResponse: HttpResponse = mock()
             whenever(mockResponse.status).thenReturn(HttpStatusCode.OK)
             
-            whenever(networkClient.getBody(eq("http://192.168.1.100/hub/advanced/hubInfo"), any()))
-                .thenReturn(beforeUpdateJson)
-                .thenReturn(afterUpdateJson)
+            whenever(networkClient.getBody(eq("http://hubitat.local/apps/api/test-app-id/devices/1"), any()))
+                .thenReturn(beforeUpdateResponse)
+                .thenReturn(afterUpdateResponse)
             
             whenever(networkClient.get(argThat { contains("/management/firmwareUpdate") }, any()))
                 .thenReturn(mockResponse)
@@ -412,11 +481,50 @@ class HubOperationsTest : FunSpec({
             HubOperations.updateHubsWithPolling(
                 listOf(hub1),
                 networkClient,
+                hubIp,
+                makerApiAppId,
+                makerApiToken,
                 maxAttempts = 5,
                 delayMillis = 100
             ) { messages.add(it) }
             
             messages.any { it.contains("updated from 2.3.4.150 to 2.3.5.160") } shouldBe true
+        }
+    }
+    
+    context("Real Hub Integration Test").config(tags = setOf(RealHubTest), enabled = false) {
+        test("should call real hub API and reproduce HTML parsing error") {
+            // This test requires a real Hubitat hub to be available
+            // Set the HUB_IP environment variable to run this test
+            // Enable this test by removing 'enabled = false' from the context config
+            // Example: HUB_IP=192.168.1.100 ./gradlew test --tests "*HubOperationsTest*"
+            
+            val hubIp = System.getenv("HUB_IP") ?: "192.168.1.100"
+            
+            val realClient = HttpClient(CIO)
+            val networkClient = KtorNetworkClient(realClient)
+            
+            val hub = Device.Hub(1, "Real Test Hub")
+            hub.ip = hubIp
+            
+            try {
+                // This should now PASS with the correct Maker API endpoint
+                val (current, available) = HubOperations.getHubVersions(
+                    hub, networkClient, hubIp, makerApiAppId, makerApiToken
+                )
+                
+                println("Current version: $current")
+                println("Available version: $available")
+                
+                // If we get here, the endpoint returned valid JSON
+                current.isNotEmpty() shouldBe true
+            } catch (e: Exception) {
+                // If this fails, check the error message for diagnostic info
+                println("Error occurred: ${e.message}")
+                throw e
+            } finally {
+                realClient.close()
+            }
         }
     }
 })

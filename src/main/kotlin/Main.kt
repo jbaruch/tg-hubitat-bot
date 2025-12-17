@@ -77,6 +77,9 @@ fun main() {
                     HubOperations.updateHubsWithPolling(
                         hubs,
                         networkClient,
+                        config.defaultHubIp,
+                        config.makerApiAppId,
+                        config.makerApiToken,
                         progressCallback = { progressMessage ->
                             bot.sendMessage(
                                 chatId = ChatId.fromId(message.chat.id),

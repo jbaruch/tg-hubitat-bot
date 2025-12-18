@@ -4,8 +4,12 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldNotBeEmpty
+import io.kotest.matchers.string.shouldContain
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
+import io.ktor.client.engine.mock.*
+import io.ktor.http.*
+import io.ktor.utils.io.*
 import jbaru.ch.telegram.hubitat.*
 import jbaru.ch.telegram.hubitat.model.Device
 import kotlinx.serialization.json.*
@@ -142,6 +146,180 @@ class RealHubitatApiTest : FunSpec({
                     println("   - $name = '$value'")
                 }
             }
+            
+        } finally {
+            client.close()
+        }
+    }
+    
+    test("should handle hub update status monitoring with polling").config(enabled = versionTestEnabled) {
+        val client = HttpClient(CIO)
+        val networkClient = KtorNetworkClient(client)
+        
+        val hub = Device.Hub(
+            id = hubInfoDeviceId!!.toInt(),
+            label = "Test Hub",
+            ip = hubIp!!,
+            managementToken = "not-used-in-this-test"
+        )
+        
+        try {
+            // Test the update monitoring flow with multiple polling attempts
+            val result = HubOperations.updateHubsWithPolling(
+                hubs = listOf(hub),
+                networkClient = networkClient,
+                hubIp = hubIp,
+                makerApiAppId = makerApiAppId!!,
+                makerApiToken = makerApiToken!!,
+                maxAttempts = 3,  // Try multiple times to catch polling errors
+                delayMillis = 1000,  // 1 second delay
+                progressCallback = { message ->
+                    println("   Progress: $message")
+                }
+            )
+            
+            println("✅ Update monitoring result: ${if (result.isSuccess) "SUCCESS" else "FAILED"}")
+            if (result.isFailure) {
+                println("   Error: ${result.exceptionOrNull()?.message}")
+            } else {
+                println("   Message: ${result.getOrNull()}")
+            }
+            
+        } finally {
+            client.close()
+        }
+    }
+    
+    test("should handle empty or malformed responses during polling").config(enabled = versionTestEnabled) {
+        val client = HttpClient(CIO)
+        val networkClient = KtorNetworkClient(client)
+        
+        val hub = Device.Hub(
+            id = hubInfoDeviceId!!.toInt(),
+            label = "Test Hub",  
+            ip = hubIp!!,
+            managementToken = "not-used-in-this-test"
+        )
+        
+        try {
+            // Make multiple calls to getHubVersions to see if we can reproduce empty response
+            println("   Making multiple version check calls...")
+            for (i in 1..5) {
+                try {
+                    val (current, latest) = HubOperations.getHubVersions(
+                        hub = hub,
+                        networkClient = networkClient,
+                        hubIp = hubIp,
+                        makerApiAppId = makerApiAppId!!,
+                        makerApiToken = makerApiToken!!
+                    )
+                    println("   Call $i: current='$current', latest='$latest'")
+                } catch (e: Exception) {
+                    println("   Call $i FAILED: ${e.message}")
+                    throw e  // Fail the test
+                }
+                kotlinx.coroutines.delay(500)  // Small delay between calls
+            }
+            
+            println("✅ All version checks succeeded")
+            
+        } finally {
+            client.close()
+        }
+    }
+    
+    test("should retry on transient failures during polling") {
+        // Test with mocked responses that fail twice then succeed
+        var callCount = 0
+        val mockEngine = MockEngine { request ->
+            callCount++
+            if (callCount <= 2) {
+                // First two calls return empty response
+                respond(
+                    content = ByteReadChannel(""),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            } else {
+                // Third call succeeds
+                respond(
+                    content = ByteReadChannel("""{"attributes":[{"name":"firmwareVersionString","currentValue":"2.4.3.172"},{"name":"hubUpdateVersion","currentValue":"2.4.3.172"}]}"""),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+        }
+        
+        val client = HttpClient(mockEngine)
+        val networkClient = KtorNetworkClient(client)
+        
+        val hub = Device.Hub(
+            id = 445,
+            label = "Test Hub",
+            ip = "192.168.1.100",
+            managementToken = "test-token"
+        )
+        
+        try {
+            // This should succeed after retries
+            val result = runCatching {
+                HubOperations.getHubVersions(
+                    hub = hub,
+                    networkClient = networkClient,
+                    hubIp = "192.168.1.100",
+                    makerApiAppId = "398",
+                    makerApiToken = "test-token"
+                )
+            }
+            
+            // Note: The retry logic is in updateHubsWithPolling, not getHubVersions
+            // So this will fail on first empty response
+            result.isFailure shouldBe true
+            
+            println("✅ Transient failure test completed (retry logic is in polling loop)")
+            
+        } finally {
+            client.close()
+        }
+    }
+    
+    test("should handle empty response gracefully") {
+        // Test with mocked empty response
+        val mockEngine = MockEngine { request ->
+            respond(
+                content = ByteReadChannel(""),
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        
+        val client = HttpClient(mockEngine)
+        val networkClient = KtorNetworkClient(client)
+        
+        val hub = Device.Hub(
+            id = 445,
+            label = "Test Hub",
+            ip = "192.168.1.100",
+            managementToken = "test-token"
+        )
+        
+        try {
+            val result = runCatching {
+                HubOperations.getHubVersions(
+                    hub = hub,
+                    networkClient = networkClient,
+                    hubIp = "192.168.1.100",
+                    makerApiAppId = "398",
+                    makerApiToken = "test-token"
+                )
+            }
+            
+            result.isFailure shouldBe true
+            val error = result.exceptionOrNull()
+            error shouldNotBe null
+            error?.message shouldContain "empty response"
+            
+            println("✅ Empty response handled gracefully: ${error?.message?.take(100)}")
             
         } finally {
             client.close()

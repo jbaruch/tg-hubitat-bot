@@ -71,6 +71,14 @@ object HubOperations {
         val endpoint = "http://${hubIp}/apps/api/${makerApiAppId}/devices/${hub.id}"
         val responseBody = networkClient.getBody(endpoint, mapOf("access_token" to makerApiToken))
         
+        // Check for empty response
+        if (responseBody.isBlank()) {
+            throw Exception(
+                "Failed to get hub info for hub '${hub.label}' from endpoint '$endpoint': " +
+                "Received empty response. This may happen if the hub is busy or restarting."
+            )
+        }
+        
         try {
             val json = Json.parseToJsonElement(responseBody).jsonObject
             val attributes = json["attributes"] as? JsonArray
@@ -194,13 +202,36 @@ object HubOperations {
             for (hubLabel in currentProgress.inProgressHubs) {
                 val hub = hubs.find { it.label == hubLabel } ?: continue
                 try {
-                    val (newCurrent, _) = getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
-                    val originalVersion = versionInfo[hubLabel]!!.currentVersion
-                    val targetVersion = versionInfo[hubLabel]!!.availableVersion
+                    // Retry logic for transient failures (empty responses, network issues)
+                    var retryCount = 0
+                    val maxRetries = 3
+                    var lastException: Exception? = null
                     
-                    if (newCurrent != originalVersion) {
-                        updatedHubs.add(hubLabel)
-                        progressCallback("Hub $hubLabel updated from $originalVersion to $newCurrent")
+                    while (retryCount < maxRetries) {
+                        try {
+                            val (newCurrent, _) = getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
+                            val originalVersion = versionInfo[hubLabel]!!.currentVersion
+                            val targetVersion = versionInfo[hubLabel]!!.availableVersion
+                            
+                            if (newCurrent != originalVersion) {
+                                updatedHubs.add(hubLabel)
+                                progressCallback("Hub $hubLabel updated from $originalVersion to $newCurrent")
+                            }
+                            break  // Success, exit retry loop
+                        } catch (e: Exception) {
+                            lastException = e
+                            retryCount++
+                            if (retryCount < maxRetries) {
+                                // Exponential backoff: 2s, 4s, 8s
+                                val backoffDelay = 2000L * (1 shl (retryCount - 1))
+                                delay(backoffDelay)
+                            }
+                        }
+                    }
+                    
+                    // If all retries failed, mark as failed
+                    if (retryCount >= maxRetries && lastException != null) {
+                        throw lastException
                     }
                 } catch (e: Exception) {
                     failedHubs[hubLabel] = e.message ?: "Unknown error"

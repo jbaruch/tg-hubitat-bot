@@ -283,6 +283,50 @@ class RealHubitatApiTest : FunSpec({
         }
     }
     
+    test("should handle incomplete JSON response") {
+        // Test with incomplete JSON (just a closing paren)
+        val mockEngine = MockEngine { request ->
+            respond(
+                content = ByteReadChannel(")"),
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        
+        val client = HttpClient(mockEngine)
+        val networkClient = KtorNetworkClient(client)
+        
+        val hub = Device.Hub(
+            id = 445,
+            label = "Test Hub",
+            ip = "192.168.1.100",
+            managementToken = "test-token"
+        )
+        
+        try {
+            val result = runCatching {
+                HubOperations.getHubVersions(
+                    hub = hub,
+                    networkClient = networkClient,
+                    hubIp = "192.168.1.100",
+                    makerApiAppId = "398",
+                    makerApiToken = "test-token"
+                )
+            }
+            
+            result.isFailure shouldBe true
+            val error = result.exceptionOrNull()
+            error shouldNotBe null
+            error?.message shouldContain "incomplete response"
+            error?.message shouldContain ")"
+            
+            println("✅ Incomplete JSON handled gracefully: ${error?.message?.take(150)}")
+            
+        } finally {
+            client.close()
+        }
+    }
+    
     test("should handle empty response gracefully") {
         // Test with mocked empty response
         val mockEngine = MockEngine { request ->

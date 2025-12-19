@@ -3,17 +3,17 @@
 ## Bug Fix: Hub Update Status Monitoring
 
 ### Problem
-During hub update monitoring with polling, the system would fail with "Cannot read Json element because of unexpected end of the input" errors when the hub returned empty responses. This typically happens when:
+During hub update monitoring with polling, the system would fail with "Cannot read Json element because of unexpected end of the input" errors when the hub returned incomplete/truncated JSON responses (e.g., just ")"). This typically happens when:
 - The hub is busy processing an update
-- The hub is temporarily restarting
-- Network issues cause incomplete responses
+- The hub is temporarily restarting or crashing mid-response
+- Network issues cause response truncation
 
 ### Solution
 Added robust error handling and retry logic:
 
-1. **Empty Response Detection**: Check for blank responses before attempting JSON parsing
+1. **Incomplete Response Detection**: Check for empty or suspiciously short responses (< 10 chars) before attempting JSON parsing
 2. **Retry Logic with Exponential Backoff**: Automatically retry failed version checks up to 3 times with increasing delays (2s, 4s, 8s)
-3. **Better Error Messages**: Clear error messages indicating when empty responses are received
+3. **Better Error Messages**: Clear error messages indicating when incomplete/malformed responses are received, showing the actual response content
 
 ### Changes Made
 - Added empty response check in `HubOperations.getHubVersions()`

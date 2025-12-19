@@ -71,11 +71,19 @@ object HubOperations {
         val endpoint = "http://${hubIp}/apps/api/${makerApiAppId}/devices/${hub.id}"
         val responseBody = networkClient.getBody(endpoint, mapOf("access_token" to makerApiToken))
         
-        // Check for empty response
+        // Check for empty or very short response (likely incomplete)
         if (responseBody.isBlank()) {
             throw Exception(
                 "Failed to get hub info for hub '${hub.label}' from endpoint '$endpoint': " +
                 "Received empty response. This may happen if the hub is busy or restarting."
+            )
+        }
+        
+        if (responseBody.length < 10) {
+            throw Exception(
+                "Failed to get hub info for hub '${hub.label}' from endpoint '$endpoint': " +
+                "Received incomplete response (${responseBody.length} chars): '$responseBody'. " +
+                "This may happen if the hub is busy, restarting, or experiencing network issues."
             )
         }
         

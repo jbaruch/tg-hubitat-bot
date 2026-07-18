@@ -118,4 +118,46 @@ class DeviceManagerTest {
         assertEquals(1, switches.size)
         assertEquals("Garage Door", switches.first().label)
     }
+
+    @Test
+    fun `test unknown device type is skipped with a warning instead of crashing`() {
+        // A newly-installed driver with no @Serializable subclass must not take
+        // the whole device list (and the bot) down at boot.
+        val json = """
+            [
+                {"id": 1, "label": "Living Room Lights", "type": "Room Lights Activator Bulb"},
+                {"id": 612, "label": "Backyard String Lights", "type": "Some Brand New Driver"},
+                {"id": 4, "label": "Garage Door", "type": "Virtual Switch"}
+            ]
+        """.trimIndent()
+
+        val manager = DeviceManager(json)
+        val (count, warnings) = manager.refreshDevices(json)
+
+        // The two known devices load; the unknown one is skipped, not fatal.
+        assertEquals(2, count)
+        assertTrue(warnings.any { it.contains("Some Brand New Driver") && it.contains("Backyard String Lights") })
+
+        // Known devices remain usable.
+        assertTrue(manager.findDevice("Living Room Lights", "on").isSuccess)
+        assertTrue(manager.findDevice("Garage Door", "on").isSuccess)
+        // The unknown device is absent.
+        assertTrue(manager.findDevice("Backyard String Lights", "on").isFailure)
+    }
+
+    @Test
+    fun `test malformed device element is skipped with a warning`() {
+        // A structurally-broken entry (missing required fields) is skipped too.
+        val json = """
+            [
+                {"id": 4, "label": "Garage Door", "type": "Virtual Switch"},
+                {"type": "Virtual Switch"}
+            ]
+        """.trimIndent()
+
+        val (count, warnings) = DeviceManager(json).refreshDevices(json)
+
+        assertEquals(1, count)
+        assertTrue(warnings.any { it.startsWith("WARNING Skipping unsupported device") })
+    }
 }

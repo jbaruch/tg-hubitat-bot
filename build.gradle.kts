@@ -1,3 +1,19 @@
+buildscript {
+    configurations.classpath {
+        resolutionStrategy {
+            // The jib-gradle-plugin bundles vulnerable build-time deps
+            // (jackson 2.15.2, commons-lang3 3.14.0). These run only during image
+            // build and never ship in the container, but force patched versions
+            // to clear the Dependabot alerts against the plugin classpath.
+            force(
+                "com.fasterxml.jackson.core:jackson-databind:2.18.9",
+                "com.fasterxml.jackson.core:jackson-core:2.18.9",
+                "org.apache.commons:commons-lang3:3.18.0"
+            )
+        }
+    }
+}
+
 plugins {
     kotlin("jvm") version "2.3.0-RC3"
     kotlin("plugin.serialization") version "2.3.0-RC3"
@@ -7,7 +23,7 @@ plugins {
 }
 
 group = "jbaru.ch"
-version = "3.6"
+version = "3.7"
 
 repositories {
     mavenCentral()
@@ -22,6 +38,15 @@ val kotlinx_serialization_version: String by project
 val kotest_version: String by project
 
 dependencies {
+    constraints {
+        // gson is pulled transitively by the telegram bot (retrofit converter-gson)
+        // at 2.8.5, which has a known deserialization DoS (CVE fixed in 2.8.9).
+        // Force a patched version onto the runtime classpath.
+        implementation("com.google.code.gson:gson:2.11.0") {
+            because("2.8.5 (pulled via retrofit converter-gson) is vulnerable; 2.8.9+ is patched")
+        }
+    }
+
     implementation("io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:$kotlin_tg_bot_version")
     testImplementation(kotlin("test"))
     implementation("io.ktor:ktor-client-core:$ktor_version")

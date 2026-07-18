@@ -10,6 +10,7 @@ import com.github.kotlintelegrambot.entities.Message
 import io.ktor.client.*
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import io.ktor.http.HttpStatusCode
@@ -29,7 +30,14 @@ import io.ktor.client.statement.bodyAsText
 
 private lateinit var config: BotConfiguration
 private lateinit var hubs: List<Device.Hub>
-private val client = HttpClient(CIO)
+private val client = HttpClient(CIO) {
+    // Never let a hung or rebooting hub block a command handler forever.
+    install(HttpTimeout) {
+        connectTimeoutMillis = 10_000
+        requestTimeoutMillis = 30_000
+        socketTimeoutMillis = 30_000
+    }
+}
 private lateinit var networkClient: NetworkClient
 private lateinit var deviceManager: DeviceManager
 

@@ -2,6 +2,10 @@ package jbaru.ch.telegram.hubitat
 
 import jbaru.ch.telegram.hubitat.model.Device
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 class DeviceManager(deviceListJson: String) {
 
@@ -17,10 +21,29 @@ class DeviceManager(deviceListJson: String) {
 
     fun refreshDevices(deviceListJson: String): Pair<Int, List<String>> {
         val format = Json { ignoreUnknownKeys = true }
-        devices = format.decodeFromString<List<Device>>(deviceListJson)
+        val warnings: MutableList<String> = ArrayList()
+
+        // Decode device-by-device so a single unknown or malformed device (e.g. a
+        // newly-installed driver with no @Serializable subclass yet) is skipped
+        // with a visible warning instead of aborting the whole list and crashing
+        // the bot at boot.
+        devices = format.parseToJsonElement(deviceListJson).jsonArray.mapNotNull { element ->
+            try {
+                format.decodeFromJsonElement<Device>(element)
+            } catch (e: Exception) {
+                val type = element.jsonObject["type"]?.jsonPrimitive?.content ?: "unknown"
+                val label = element.jsonObject["label"]?.jsonPrimitive?.content ?: "unknown"
+                val message = "WARNING Skipping unsupported device (type='$type', label='$label'): " +
+                    (e.message?.substringBefore('\n') ?: e.toString())
+                warnings.add(message)
+                println(message)
+                null
+            }
+        }
+
         deviceCache.clear()
-        val result: Pair<Int, List<String>> = Pair(devices.size, initializeCache(devices))
-        return result
+        warnings.addAll(initializeCache(devices))
+        return Pair(devices.size, warnings)
     }
 
     fun isDeviceCommand(command: String): Boolean {

@@ -98,13 +98,49 @@ class CommandHandlersTest : FunSpec({
             val device = Device.VirtualSwitch(1, "Kitchen Light")
             whenever(deviceManager.findDevice(eq("kitchen_light"), eq("invalidCommand")))
                 .thenReturn(Result.success(device))
-            
+
             val result = CommandHandlers.handleDeviceCommand(
                 bot, message, deviceManager, networkClient,
                 makerApiAppId, makerApiToken, defaultHubIp
             )
-            
+
             result shouldContain "not supported by device"
+        }
+
+        test("should return error when message text is null") {
+            val message = mock<Message> {
+                on { text } doReturn null
+            }
+
+            val result = CommandHandlers.handleDeviceCommand(
+                bot, message, deviceManager, networkClient,
+                makerApiAppId, makerApiToken, defaultHubIp
+            )
+
+            result shouldContain "Please specify a device name"
+        }
+
+        test("should execute command that takes arguments") {
+            // Covers the args-present path in runDeviceCommand.
+            val message = mock<Message> {
+                on { text } doReturn "/push button 1"
+            }
+            val device = Device.VirtualButton(1, "Button")
+            whenever(deviceManager.findDevice(eq("button"), eq("push")))
+                .thenReturn(Result.success(device))
+
+            val mockResponse = mock<HttpResponse> {
+                on { status } doReturn HttpStatusCode.OK
+            }
+            whenever(networkClient.get(argThat { contains("/devices/1/push/1") }, any()))
+                .thenReturn(mockResponse)
+
+            val result = CommandHandlers.handleDeviceCommand(
+                bot, message, deviceManager, networkClient,
+                makerApiAppId, makerApiToken, defaultHubIp
+            )
+
+            result shouldBe "OK"
         }
     }
     
@@ -224,7 +260,24 @@ class CommandHandlersTest : FunSpec({
                 deviceManager, networkClient,
                 makerApiAppId, makerApiToken, defaultHubIp
             )
-            
+
+            result shouldBe "No open sensors found."
+        }
+
+        test("should treat a sensor with no value attribute as not open") {
+            // Covers the '?: \"Unknown\"' fallback in getDeviceAttribute.
+            val sensor = Device.GenericZigbeeContactSensor(1, "Front Door")
+            whenever(deviceManager.findDevicesByType(Device.ContactSensor::class.java))
+                .thenReturn(listOf(sensor))
+
+            whenever(networkClient.getBody(any(), any()))
+                .thenReturn("""{"notValue": "whatever"}""")
+
+            val result = CommandHandlers.handleGetOpenSensorsCommand(
+                deviceManager, networkClient,
+                makerApiAppId, makerApiToken, defaultHubIp
+            )
+
             result shouldBe "No open sensors found."
         }
     }

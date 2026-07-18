@@ -250,11 +250,27 @@ class HubOperationsTest : FunSpec({
                 HubOperations.getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
                 throw AssertionError("Expected exception to be thrown")
             } catch (e: Exception) {
-                e.message shouldContain "Test Hub"
-                e.message shouldContain "http://hubitat.local/apps/api/test-app-id/devices/1"
+                e.message shouldContain "empty response"
             }
         }
         
+        test("should handle incomplete/truncated response") {
+            val hub = Device.Hub(1, "Test Hub")
+            
+            // Simulate truncated JSON response (like just ")")
+            whenever(networkClient.getBody(eq("http://hubitat.local/apps/api/test-app-id/devices/1"), any()))
+                .thenReturn(")")
+            
+            try {
+                HubOperations.getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
+                throw AssertionError("Expected exception to be thrown")
+            } catch (e: Exception) {
+                e.message shouldContain "incomplete response"
+                e.message shouldContain "1 chars"
+                e.message shouldContain ")"
+            }
+        }
+
         test("should truncate long response preview to 200 characters") {
             val hub = Device.Hub(1, "Test Hub")
             

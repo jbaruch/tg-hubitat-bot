@@ -43,3 +43,19 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+### tessl ###
+# tessl.json is the descriptor and IS committed; everything below is
+# downloaded plugin content or generated agent/MCP config that `tessl install`
+# regenerates from tessl.json (npm model: commit the manifest, ignore node_modules).
+.tessl/
+.mcp.json
+.agents/
+.claude/
+.codex/
+.gemini/
+.github/mcp.json
+.github/skills/
+AGENTS.md
+CLAUDE.md
+package-lock.json

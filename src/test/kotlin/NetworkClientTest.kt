@@ -51,8 +51,30 @@ class NetworkClientTest : FunSpec({
                 "http://test.com/api",
                 mapOf("access_token" to "token123")
             )
-            
+
             response.status shouldBe HttpStatusCode.OK
+        }
+    }
+
+    context("secret redaction") {
+        test("redact masks sensitive param values but keeps the rest") {
+            val redacted = KtorNetworkClient.redact(
+                mapOf("access_token" to "secret123", "token" to "mgmt456", "mode" to "Away")
+            )
+
+            redacted["access_token"] shouldBe "[REDACTED]"
+            redacted["token"] shouldBe "[REDACTED]"
+            redacted["mode"] shouldBe "Away"
+        }
+
+        test("redact leaves a map with no sensitive keys unchanged") {
+            val params = mapOf("mode" to "Home", "id" to "5")
+            KtorNetworkClient.redact(params) shouldBe params
+        }
+
+        test("isSecretResponse flags the management-token endpoint") {
+            KtorNetworkClient.isSecretResponse("http://192.168.30.15/hub/advanced/getManagementToken") shouldBe true
+            KtorNetworkClient.isSecretResponse("http://192.168.30.15/apps/api/398/devices") shouldBe false
         }
     }
 })

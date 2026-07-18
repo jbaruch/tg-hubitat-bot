@@ -23,7 +23,7 @@ plugins {
 }
 
 group = "jbaru.ch"
-version = "3.7"
+version = "3.8"
 
 repositories {
     mavenCentral()

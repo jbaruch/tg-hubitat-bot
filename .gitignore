@@ -59,3 +59,7 @@ bin/
 AGENTS.md
 CLAUDE.md
 package-lock.json
+
+### Deploy secrets ###
+# Real secrets live here; .env.example is the committed descriptor.
+.env

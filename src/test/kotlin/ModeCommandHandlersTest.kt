@@ -147,6 +147,34 @@ class ModeCommandHandlersTest : FunSpec({
             result shouldContain "Away"
         }
         
+        test("should return error when message text is null") {
+            val message = mock<Message> {
+                on { text } doReturn null
+            }
+
+            val result = CommandHandlers.handleSetModeCommand(
+                message, networkClient, makerApiAppId, makerApiToken, hubIp
+            )
+
+            result shouldContain "Please specify a mode name"
+        }
+
+        test("should return generic error when set mode fails for a non-not-found reason") {
+            // Covers the else branch of the 'Mode not found' check.
+            val message = mock<Message> {
+                on { text } doReturn "/set_mode Away"
+            }
+
+            whenever(networkClient.getBody(any(), any())).thenThrow(RuntimeException("Network boom"))
+
+            val result = CommandHandlers.handleSetModeCommand(
+                message, networkClient, makerApiAppId, makerApiToken, hubIp
+            )
+
+            result shouldContain "Error setting mode"
+            result shouldContain "Network boom"
+        }
+
         test("should format confirmation message correctly") {
             val message = mock<Message> {
                 on { text } doReturn "/set_mode Night"

@@ -157,9 +157,8 @@ class DeviceManager(deviceListJson: String) {
     }
 
 
-    override fun toString(): String {
-        return devices.size.toString()
-    }
+    val deviceCount: Int
+        get() = devices.size
 
     private fun initializeCache(devices: List<Device>): List<String> {
         val warnings: MutableList<String> = ArrayList()

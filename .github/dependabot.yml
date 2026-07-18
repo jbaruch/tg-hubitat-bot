@@ -1,0 +1,21 @@
+version: 2
+updates:
+  # Direct Gradle dependencies and plugins (transitive vulns still need manual
+  # constraints — see build.gradle.kts).
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      gradle:
+        patterns: ["*"]
+
+  # Keep GitHub Actions in the workflows up to date.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns: ["*"]

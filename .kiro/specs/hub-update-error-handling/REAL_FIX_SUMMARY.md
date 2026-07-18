@@ -88,7 +88,7 @@ docker run -d --name tg-hubitat-bot \
   -e BOT_TOKEN=your_token \
   -e MAKER_API_APP_ID=398 \
   -e MAKER_API_TOKEN=your_token \
-  -e DEFAULT_HUB_IP=192.168.30.2 \
+  -e DEFAULT_HUB_IP=192.168.30.15 \
   jbaru.ch/tg-hubitat-bot:3.2
 ```
 

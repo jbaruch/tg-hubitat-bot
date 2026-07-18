@@ -208,7 +208,22 @@ class HubOperationsTest : FunSpec({
             current shouldBe ""
             available shouldBe ""
         }
-        
+
+        test("should handle response with no attributes key at all") {
+            val hub = Device.Hub(1, "Test Hub")
+
+            // Valid JSON, long enough to pass the length check, but no "attributes" array
+            val makerApiResponse = """{"id": "1", "name": "Hub Information"}"""
+
+            whenever(networkClient.getBody(eq("http://hubitat.local/apps/api/test-app-id/devices/1"), any()))
+                .thenReturn(makerApiResponse)
+
+            val (current, available) = HubOperations.getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
+
+            current shouldBe ""
+            available shouldBe ""
+        }
+
         test("should handle network error") {
             val hub = Device.Hub(1, "Test Hub")
             
@@ -250,11 +265,27 @@ class HubOperationsTest : FunSpec({
                 HubOperations.getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
                 throw AssertionError("Expected exception to be thrown")
             } catch (e: Exception) {
-                e.message shouldContain "Test Hub"
-                e.message shouldContain "http://hubitat.local/apps/api/test-app-id/devices/1"
+                e.message shouldContain "empty response"
             }
         }
         
+        test("should handle incomplete/truncated response") {
+            val hub = Device.Hub(1, "Test Hub")
+            
+            // Simulate truncated JSON response (like just ")")
+            whenever(networkClient.getBody(eq("http://hubitat.local/apps/api/test-app-id/devices/1"), any()))
+                .thenReturn(")")
+            
+            try {
+                HubOperations.getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
+                throw AssertionError("Expected exception to be thrown")
+            } catch (e: Exception) {
+                e.message shouldContain "incomplete response"
+                e.message shouldContain "1 chars"
+                e.message shouldContain ")"
+            }
+        }
+
         test("should truncate long response preview to 200 characters") {
             val hub = Device.Hub(1, "Test Hub")
             
@@ -360,7 +391,7 @@ class HubOperationsTest : FunSpec({
             val hub1 = Device.Hub(1, "Hub 1")
             hub1.ip = "192.168.1.100"
             hub1.managementToken = "token1"
-            
+
             val makerApiResponse = """
                 {
                     "attributes": [
@@ -369,16 +400,16 @@ class HubOperationsTest : FunSpec({
                     ]
                 }
             """.trimIndent()
-            
+
             val mockResponse: HttpResponse = mock()
             whenever(mockResponse.status).thenReturn(HttpStatusCode.OK)
-            
+
             whenever(networkClient.getBody(eq("http://hubitat.local/apps/api/test-app-id/devices/1"), any()))
                 .thenReturn(makerApiResponse)
-            
+
             whenever(networkClient.get(argThat { contains("/management/firmwareUpdate") }, any()))
                 .thenReturn(mockResponse)
-            
+
             val messages = mutableListOf<String>()
             val result = HubOperations.updateHubsWithPolling(
                 listOf(hub1),
@@ -389,10 +420,79 @@ class HubOperationsTest : FunSpec({
                 maxAttempts = 2,
                 delayMillis = 100
             ) { messages.add(it) }
-            
+
             result.isFailure shouldBe true
             result.exceptionOrNull()?.message shouldContain "Update timeout"
             messages.any { it.contains("Timeout") } shouldBe true
+        }
+
+        test("should fail when update initiation returns non-OK status") {
+            val hub1 = Device.Hub(1, "Hub 1")
+            hub1.ip = "192.168.1.100"
+            hub1.managementToken = "token1"
+
+            val needsUpdateResponse = """
+                {
+                    "attributes": [
+                        {"name": "firmwareVersionString", "currentValue": "2.3.4.150"},
+                        {"name": "hubUpdateVersion", "currentValue": "2.3.5.160"}
+                    ]
+                }
+            """.trimIndent()
+
+            val mockResponse: HttpResponse = mock()
+            whenever(mockResponse.status).thenReturn(HttpStatusCode.InternalServerError)
+
+            whenever(networkClient.getBody(eq("http://hubitat.local/apps/api/test-app-id/devices/1"), any()))
+                .thenReturn(needsUpdateResponse)
+            whenever(networkClient.get(argThat { contains("/management/firmwareUpdate") }, any()))
+                .thenReturn(mockResponse)
+
+            val result = HubOperations.updateHubsWithPolling(
+                listOf(hub1),
+                networkClient,
+                hubIp,
+                makerApiAppId,
+                makerApiToken,
+                maxAttempts = 2,
+                delayMillis = 100
+            ) { }
+
+            result.isFailure shouldBe true
+            result.exceptionOrNull()?.message shouldContain "Failed to initiate update for hub Hub 1"
+        }
+
+        test("should fail when update initiation throws an exception") {
+            val hub1 = Device.Hub(1, "Hub 1")
+            hub1.ip = "192.168.1.100"
+            hub1.managementToken = "token1"
+
+            val needsUpdateResponse = """
+                {
+                    "attributes": [
+                        {"name": "firmwareVersionString", "currentValue": "2.3.4.150"},
+                        {"name": "hubUpdateVersion", "currentValue": "2.3.5.160"}
+                    ]
+                }
+            """.trimIndent()
+
+            whenever(networkClient.getBody(eq("http://hubitat.local/apps/api/test-app-id/devices/1"), any()))
+                .thenReturn(needsUpdateResponse)
+            whenever(networkClient.get(argThat { contains("/management/firmwareUpdate") }, any()))
+                .thenThrow(RuntimeException("connection refused"))
+
+            val result = HubOperations.updateHubsWithPolling(
+                listOf(hub1),
+                networkClient,
+                hubIp,
+                makerApiAppId,
+                makerApiToken,
+                maxAttempts = 2,
+                delayMillis = 100
+            ) { }
+
+            result.isFailure shouldBe true
+            result.exceptionOrNull()?.message shouldContain "connection refused"
         }
         
         test("should report progress messages") {

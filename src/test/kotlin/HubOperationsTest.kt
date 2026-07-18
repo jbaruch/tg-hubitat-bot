@@ -494,7 +494,60 @@ class HubOperationsTest : FunSpec({
             result.isFailure shouldBe true
             result.exceptionOrNull()?.message shouldContain "connection refused"
         }
-        
+
+        test("should keep polling through a reboot (empty response) and report success") {
+            // Regression: a hub returns an empty response while rebooting to apply
+            // the update. That must be treated as still-in-progress, not a failure
+            // that ends the watch early and mis-reports a successful update.
+            val hub1 = Device.Hub(1, "Hub 1")
+            hub1.ip = "192.168.1.100"
+            hub1.managementToken = "token1"
+
+            val beforeUpdateResponse = """
+                {
+                    "attributes": [
+                        {"name": "firmwareVersionString", "currentValue": "2.3.4.150"},
+                        {"name": "hubUpdateVersion", "currentValue": "2.3.5.160"}
+                    ]
+                }
+            """.trimIndent()
+
+            val afterUpdateResponse = """
+                {
+                    "attributes": [
+                        {"name": "firmwareVersionString", "currentValue": "2.3.5.160"},
+                        {"name": "hubUpdateVersion", "currentValue": "2.3.5.160"}
+                    ]
+                }
+            """.trimIndent()
+
+            val mockResponse: HttpResponse = mock()
+            whenever(mockResponse.status).thenReturn(HttpStatusCode.OK)
+
+            // init: needs update; poll 1: empty (rebooting -> throws); poll 2: updated
+            whenever(networkClient.getBody(eq("http://hubitat.local/apps/api/test-app-id/devices/1"), any()))
+                .thenReturn(beforeUpdateResponse)
+                .thenReturn("")
+                .thenReturn(afterUpdateResponse)
+            whenever(networkClient.get(argThat { contains("/management/firmwareUpdate") }, any()))
+                .thenReturn(mockResponse)
+
+            val messages = mutableListOf<String>()
+            val result = HubOperations.updateHubsWithPolling(
+                listOf(hub1),
+                networkClient,
+                hubIp,
+                makerApiAppId,
+                makerApiToken,
+                maxAttempts = 5,
+                delayMillis = 100
+            ) { messages.add(it) }
+
+            result.isSuccess shouldBe true
+            result.getOrNull() shouldContain "Successfully updated"
+            messages.any { it.contains("still waiting") } shouldBe true
+        }
+
         test("should report progress messages") {
             val hub1 = Device.Hub(1, "Hub 1")
             hub1.ip = "192.168.1.100"

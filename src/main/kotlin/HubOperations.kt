@@ -196,65 +196,51 @@ object HubOperations {
             }
         }
         
-        // Poll hub versions periodically
+        // Poll hub versions periodically.
+        //
+        // A hub is done when its firmware moves off the original version. While a
+        // hub reboots to apply the update, the Maker API returns empty/error
+        // responses and getHubVersions throws - that is EXPECTED mid-update
+        // progress, NOT a failure. Treat it as "still rebooting", keep the hub
+        // in-progress, and keep polling until it reports the new version. A hub
+        // that genuinely never completes surfaces as the timeout below; it is
+        // never declared failed mid-flight on a transient reboot blip (which used
+        // to end the whole watch early and mis-report a successful update).
         var currentProgress = updateProgress
         var attempts = 0
-        
+
         while (!currentProgress.isComplete && attempts < maxAttempts) {
             delay(delayMillis)
             attempts++
-            
+
             val updatedHubs = mutableSetOf<String>()
-            val failedHubs = mutableMapOf<String, String>()
-            
+
             for (hubLabel in currentProgress.inProgressHubs) {
                 val hub = hubs.find { it.label == hubLabel } ?: continue
                 try {
-                    // Retry logic for transient failures (empty responses, network issues)
-                    var retryCount = 0
-                    val maxRetries = 3
-                    var lastException: Exception? = null
-                    
-                    while (retryCount < maxRetries) {
-                        try {
-                            val (newCurrent, _) = getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
-                            val originalVersion = versionInfo[hubLabel]!!.currentVersion
-                            val targetVersion = versionInfo[hubLabel]!!.availableVersion
-                            
-                            if (newCurrent != originalVersion) {
-                                updatedHubs.add(hubLabel)
-                                progressCallback("Hub $hubLabel updated from $originalVersion to $newCurrent")
-                            }
-                            break  // Success, exit retry loop
-                        } catch (e: Exception) {
-                            lastException = e
-                            retryCount++
-                            if (retryCount < maxRetries) {
-                                // Exponential backoff: 2s, 4s, 8s
-                                val backoffDelay = 2000L * (1 shl (retryCount - 1))
-                                delay(backoffDelay)
-                            }
-                        }
+                    val (newCurrent, _) = getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
+                    val originalVersion = versionInfo[hubLabel]!!.currentVersion
+                    if (newCurrent != originalVersion) {
+                        updatedHubs.add(hubLabel)
+                        progressCallback("Hub $hubLabel updated from $originalVersion to $newCurrent")
                     }
-                    
-                    // If all retries failed, mark as failed
-                    if (retryCount >= maxRetries && lastException != null) {
-                        throw lastException
-                    }
-                } catch (e: Exception) {
-                    failedHubs[hubLabel] = e.message ?: "Unknown error"
+                    // else: still on the old version - update still in progress, keep polling
+                } catch (_: Exception) {
+                    // Hub unreachable / empty response: it is rebooting to apply the
+                    // update. Keep waiting; do not mark it failed.
+                    progressCallback("Hub $hubLabel is applying the update (not reachable yet); still waiting")
                 }
             }
-            
+
             currentProgress = UpdateProgress(
                 totalHubs = currentProgress.totalHubs,
                 updatedHubs = currentProgress.updatedHubs + updatedHubs,
-                failedHubs = currentProgress.failedHubs + failedHubs,
-                inProgressHubs = currentProgress.inProgressHubs - updatedHubs - failedHubs.keys
+                failedHubs = currentProgress.failedHubs,
+                inProgressHubs = currentProgress.inProgressHubs - updatedHubs
             )
-            
+
             if (!currentProgress.isComplete) {
-                progressCallback("Progress: ${currentProgress.successCount}/${currentProgress.totalHubs} updated, ${currentProgress.failureCount} failed, ${currentProgress.inProgressHubs.size} in progress")
+                progressCallback("Progress: ${currentProgress.successCount}/${currentProgress.totalHubs} updated, ${currentProgress.inProgressHubs.size} still updating")
             }
         }
         

@@ -28,6 +28,7 @@ import com.github.kotlintelegrambot.extensions.filters.Filter
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 
+private val logger = org.slf4j.LoggerFactory.getLogger("jbaru.ch.telegram.hubitat.Main")
 private lateinit var config: BotConfiguration
 private lateinit var hubs: List<Device.Hub>
 private val client = HttpClient(CIO) {
@@ -99,7 +100,7 @@ fun main() {
                 bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = result.fold(
                     onSuccess = { it },
                     onFailure = {
-                        it.printStackTrace()
+                        logger.error("Hub update failed", it)
                         it.message.toString()
                     }
                 ))
@@ -107,10 +108,17 @@ fun main() {
             
             command("refresh") {
                 val refreshResults = runBlocking {
-                    CommandHandlers.handleRefreshCommand(
+                    val results = CommandHandlers.handleRefreshCommand(
                         deviceManager, networkClient,
                         config.makerApiAppId, config.makerApiToken, config.defaultHubIp
                     )
+                    // Re-initialize hubs too, so a hub added/changed since boot is
+                    // picked up (and its ip/managementToken refreshed) without a restart.
+                    hubs = HubOperations.initializeHubs(
+                        deviceManager, networkClient, config.defaultHubIp,
+                        config.makerApiAppId, config.makerApiToken
+                    )
+                    results
                 }
                 bot.sendMessage(
                     chatId = ChatId.fromId(message.chat.id),
@@ -174,11 +182,12 @@ fun main() {
         }
     }
 
-    println("Init successful, $deviceManager devices loaded, start polling")
+    val startupMessage = "Init successful, ${deviceManager.deviceCount} devices loaded, start polling"
+    logger.info(startupMessage)
     if (config.chatId.isNotEmpty()) {
         bot.sendMessage(
             chatId = ChatId.fromId(config.chatId.toLong()),
-            text = "Init successful, $deviceManager devices loaded, start polling"
+            text = startupMessage
         )
     }
     bot.startPolling()

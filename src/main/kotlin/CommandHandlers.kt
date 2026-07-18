@@ -7,9 +7,12 @@ import jbaru.ch.telegram.hubitat.model.Device
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.slf4j.LoggerFactory
 
 object CommandHandlers {
-    
+
+    private val logger = LoggerFactory.getLogger(CommandHandlers::class.java)
+
     suspend fun handleDeviceCommand(
         bot: Bot,
         message: Message,
@@ -41,7 +44,7 @@ object CommandHandlers {
                 }
             },
             onFailure = {
-                it.printStackTrace()
+                logger.warn("Device command '{}' failed: {}", snakeCaseCommand, it.message)
                 it.message.toString()
             }
         )

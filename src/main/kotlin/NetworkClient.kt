@@ -17,9 +17,9 @@ interface NetworkClient {
 
 class KtorNetworkClient(private val client: HttpClient) : NetworkClient {
     private val logger = LoggerFactory.getLogger(KtorNetworkClient::class.java)
-    
+
     override suspend fun get(url: String, params: Map<String, String>): HttpResponse {
-        logger.info("HTTP GET: $url with params: $params")
+        logger.info("HTTP GET: $url with params: ${redact(params)}")
         val response = client.get(url) {
             params.forEach { (key, value) ->
                 parameter(key, value)
@@ -28,18 +28,22 @@ class KtorNetworkClient(private val client: HttpClient) : NetworkClient {
         logger.info("HTTP Response: status=${response.status}, content-type=${response.contentType()}")
         return response
     }
-    
+
     override suspend fun getBody(url: String, params: Map<String, String>): String {
-        logger.info("HTTP GET (body): $url with params: $params")
+        logger.info("HTTP GET (body): $url with params: ${redact(params)}")
         val response = get(url, params)
         val body = response.body<String>()
-        val preview = if (body.length > 500) body.take(500) + "..." else body
-        logger.info("HTTP Response body preview (${body.length} chars): $preview")
+        if (isSecretResponse(url)) {
+            logger.info("HTTP Response body (${body.length} chars): [REDACTED]")
+        } else {
+            val preview = if (body.length > 500) body.take(500) + "..." else body
+            logger.info("HTTP Response body preview (${body.length} chars): $preview")
+        }
         return body
     }
-    
+
     override suspend fun put(url: String, params: Map<String, String>): HttpResponse {
-        logger.info("HTTP PUT: $url with params: $params")
+        logger.info("HTTP PUT: $url with params: ${redact(params)}")
         val response = client.put(url) {
             params.forEach { (key, value) ->
                 parameter(key, value)
@@ -47,5 +51,16 @@ class KtorNetworkClient(private val client: HttpClient) : NetworkClient {
         }
         logger.info("HTTP Response: status=${response.status}, content-type=${response.contentType()}")
         return response
+    }
+
+    companion object {
+        // Query params whose values are credentials and must never hit the logs.
+        private val SENSITIVE_KEYS = setOf("access_token", "token")
+
+        internal fun redact(params: Map<String, String>): Map<String, String> =
+            params.mapValues { (key, value) -> if (key in SENSITIVE_KEYS) "[REDACTED]" else value }
+
+        // Endpoints whose response body is itself a secret (the hub management token).
+        internal fun isSecretResponse(url: String): Boolean = url.contains("getManagementToken")
     }
 }

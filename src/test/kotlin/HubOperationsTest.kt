@@ -88,10 +88,33 @@ class HubOperationsTest : FunSpec({
             val result = HubOperations.initializeHubs(
                 deviceManager, networkClient, hubIp, makerApiAppId, makerApiToken
             )
-            
+
             result.size shouldBe 2
             result[0].ip shouldBe "192.168.1.100"
             result[1].ip shouldBe "192.168.1.101"
+        }
+
+        test("should skip a hub with no localIP instead of crashing, keeping the good ones") {
+            val goodHub = Device.Hub(1, "Good Hub")
+            val badHub = Device.Hub(2, "Bad Hub")
+            whenever(deviceManager.findDevicesByType(Device.Hub::class.java))
+                .thenReturn(listOf(goodHub, badHub))
+
+            whenever(networkClient.getBody(argThat { contains("/devices/1") }, any()))
+                .thenReturn("""{"attributes": [{"name": "localIP", "currentValue": "192.168.1.100"}]}""")
+            // Bad hub exposes attributes but no localIP.
+            whenever(networkClient.getBody(argThat { contains("/devices/2") }, any()))
+                .thenReturn("""{"attributes": [{"name": "temperatureScale", "currentValue": "F"}]}""")
+            whenever(networkClient.getBody(argThat { contains("192.168.1.100") }, any()))
+                .thenReturn("token1")
+
+            val result = HubOperations.initializeHubs(
+                deviceManager, networkClient, hubIp, makerApiAppId, makerApiToken
+            )
+
+            // Only the good hub is returned; the bad one is skipped, not fatal.
+            result.map { it.label } shouldBe listOf("Good Hub")
+            result[0].ip shouldBe "192.168.1.100"
         }
     }
     

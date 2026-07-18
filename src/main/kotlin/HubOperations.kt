@@ -4,7 +4,6 @@ import io.ktor.http.HttpStatusCode
 import jbaru.ch.telegram.hubitat.model.Device
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.delay
@@ -41,23 +40,38 @@ object HubOperations {
         makerApiAppId: String,
         makerApiToken: String
     ): List<Device.Hub> {
+        // Initialize each hub independently: a hub that doesn't expose a usable
+        // localIP (or errors out) is skipped with a warning rather than taking the
+        // whole startup down with an NPE. Only fully-initialized hubs are returned,
+        // since a hub without ip/managementToken can't be updated or rebooted.
         val hubs = deviceManager.findDevicesByType(Device.Hub::class.java)
+        val initialized = mutableListOf<Device.Hub>()
         for (hub in hubs) {
-            val json: Map<String, JsonElement> =
-                Json.parseToJsonElement(
+            try {
+                val json = Json.parseToJsonElement(
                     networkClient.getBody(
                         "http://${hubIp}/apps/api/${makerApiAppId}/devices/${hub.id}",
                         mapOf("access_token" to makerApiToken)
                     )
                 ).jsonObject
 
-            val ip = (json["attributes"] as JsonArray).find {
-                it.jsonObject["name"]!!.jsonPrimitive.content == "localIP"
-            }!!.jsonObject["currentValue"]!!.jsonPrimitive.content
-            hub.ip = ip
-            hub.managementToken = networkClient.getBody("http://${ip}/hub/advanced/getManagementToken")
+                val ip = (json["attributes"] as? JsonArray)
+                    ?.firstOrNull { it.jsonObject["name"]?.jsonPrimitive?.content == "localIP" }
+                    ?.jsonObject?.get("currentValue")?.jsonPrimitive?.content
+
+                if (ip.isNullOrBlank()) {
+                    println("WARNING Skipping hub '${hub.label}' (id=${hub.id}): no localIP attribute exposed via Maker API")
+                    continue
+                }
+
+                hub.ip = ip
+                hub.managementToken = networkClient.getBody("http://${ip}/hub/advanced/getManagementToken")
+                initialized.add(hub)
+            } catch (e: Exception) {
+                println("WARNING Skipping hub '${hub.label}' (id=${hub.id}): ${e.message?.substringBefore('\n') ?: e}")
+            }
         }
-        return hubs
+        return initialized
     }
     
     suspend fun getHubVersions(

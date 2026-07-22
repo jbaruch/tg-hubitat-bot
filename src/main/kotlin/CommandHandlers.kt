@@ -108,7 +108,8 @@ object CommandHandlers {
         return if (response.status.isSuccess()) {
             "HSM alerts cancelled."
         } else {
-            "Failed to cancel alerts: HTTP ${response.status}"
+            "Failed to cancel alerts: HTTP ${response.status}. " +
+                "Check that Maker API control of HSM is allowed and the hub is reachable, then retry."
         }
     }
     
@@ -234,7 +235,8 @@ object CommandHandlers {
         return if (response.status.isSuccess()) {
             "Done: ${device.label} → $displayCommand$argSuffix"
         } else {
-            "Failed: ${device.label} → $displayCommand$argSuffix returned HTTP ${response.status}"
+            "Failed: ${device.label} → $displayCommand$argSuffix returned HTTP ${response.status}. " +
+                "Check that the device is reachable and exposed in Maker API, then retry."
         }
     }
     

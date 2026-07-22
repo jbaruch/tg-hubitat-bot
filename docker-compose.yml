@@ -8,4 +8,5 @@ services:
       MAKER_API_APP_ID: ${MAKER_API_APP_ID}
       MAKER_API_TOKEN: ${MAKER_API_TOKEN}
       CHAT_ID: ${CHAT_ID:-}
+      ALLOWED_CHAT_IDS: ${ALLOWED_CHAT_IDS:-}
       DEFAULT_HUB_IP: ${DEFAULT_HUB_IP:-hubitat.local}

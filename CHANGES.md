@@ -1,5 +1,19 @@
 # Changes Log
 
+## Faster, Fault-Tolerant Sensor and Firmware Scans
+
+### Overview
+/get_open_sensors and /firmware fan their per-device HTTP calls out concurrently, and one flaky device no longer takes down a whole report.
+
+### Changes Made
+- /get_open_sensors reads all contact sensors concurrently (capped); an unreachable sensor is listed under "Could not read" instead of aborting the command
+- /firmware fetches per-device firmware details concurrently under the same cap
+- Internal warnings go through the logger consistently instead of println
+
+### Benefits
+- Reports come back quickly even on large fleets
+- A single flaky device degrades one line of the report, not the whole command
+
 ## /set_level for Dimmable Devices; README Stops Advertising Unimplemented Commands
 
 ### Overview

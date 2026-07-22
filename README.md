@@ -28,6 +28,7 @@
   * `/cancel_alerts` - Cancels all alerts in HSM.
   * `/update` - Updates all hubs for which Hub Information Drivers are exposed in the Maker API of `hubitat.local`.
   * `/reboot [Hub Information Driver v3 instance name]` - Reboots a specified hub.
+  * `/firmware` - Reports every Z-Wave device whose firmware is behind the latest vendor version, with download links. Report-only: it compares installed firmware against the curated catalog in `src/main/resources/zwave-firmware-catalog.json` (refreshed weekly from the Zooz KB page via a scheduled GitHub Action) and refuses to guess when the hardware line is ambiguous — flashing the wrong 700-series/800LR image can brick a device.
 
 
 ## Device Name Notations:

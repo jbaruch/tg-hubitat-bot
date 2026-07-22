@@ -106,6 +106,19 @@ fun main() {
                 ))
             }
             
+            command("firmware") {
+                val chatId = ChatId.fromId(message.chat.id)
+                val messages = runBlocking {
+                    try {
+                        FirmwareOperations.checkFirmware(hubs, networkClient)
+                    } catch (e: Exception) {
+                        logger.error("Firmware check failed", e)
+                        listOf("Firmware check failed: ${e.message}")
+                    }
+                }
+                messages.forEach { bot.sendMessage(chatId = chatId, text = it) }
+            }
+
             command("refresh") {
                 val refreshResults = runBlocking {
                     val results = CommandHandlers.handleRefreshCommand(

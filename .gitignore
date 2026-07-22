@@ -62,4 +62,4 @@ package-lock.json
 
 ### Deploy secrets ###
 # Real secrets live here; .env.example is the committed descriptor.
-.env
+.env__pycache__/

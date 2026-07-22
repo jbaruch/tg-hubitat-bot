@@ -1,5 +1,5 @@
 {
-  "catalogVersion": "2026-07-21",
+  "catalogVersion": "2026-07-22",
   "entries": [
     {
       "model": "ZEN04",
@@ -290,6 +290,24 @@
       ]
     },
     {
+      "model": "DZ6HD",
+      "vendor": "Leviton",
+      "description": "Decora Smart 600W In-Wall Dimmer",
+      "match": {
+        "deviceModels": ["DZ6HD"],
+        "ids": [{ "manufacturer": 29, "deviceType": 13569, "deviceId": 1 }]
+      },
+      "lines": [
+        {
+          "line": "mains",
+          "installedMajor": [1],
+          "latest": "1.22",
+          "url": "https://leviton.com/content/dam/leviton/support/DZ6HD_v1_22.ota",
+          "note": "do NOT cross Leviton model files (brick risk)"
+        }
+      ]
+    },
+    {
       "model": "DZPD3",
       "vendor": "Leviton",
       "description": "Decora Smart Plug-in Dimmer",
@@ -347,14 +365,14 @@
       "battery": true,
       "flirs": true,
       "recommendation": "warn",
-      "warning": "Locks on 1.01 / early-2022 HW often FAIL the 1.5 update (Invalid Firmware Target); U-Tec's fix was hardware replacement. 1.5 changelog is 'Fixed door state issue' only, community reports 1.5 WORSENS lock-state reporting, and there is NO downgrade off 1.5. Not recommended.",
+      "warning": "Locks on 1.01 / early-2022 HW often FAIL OTA updates (Invalid Firmware Target on 1.5); U-Tec's fix was hardware replacement, and no downgrade path is known. 1.5 reportedly WORSENED lock-state reporting; 1.7 exists on U-Tec's server (1.6 was never published) but has no known changelog or community track record yet. Not recommended without researching 1.7 first.",
       "lines": [
         {
           "line": "all",
           "installedMajor": [1],
-          "latest": "1.5",
-          "url": "https://file.u-tec.com/homekit/U-BOLT-PRO-ZWAVE_V1.5.gbl",
-          "note": "sha256 fc0b831cf69dfbf4af7b6c95ee92b349899390b36daedb3413bfa17117eb4bab"
+          "latest": "1.7",
+          "url": "https://file.u-tec.com/homekit/U-BOLT-PRO-ZWAVE_V1.7.gbl",
+          "note": "1.5 sha256 fc0b831cf69dfbf4af7b6c95ee92b349899390b36daedb3413bfa17117eb4bab (V1.5.gbl still published)"
         }
       ]
     },

@@ -239,6 +239,19 @@ class FirmwareOperationsTest : FunSpec({
             FirmwareOperations.classify(
                 device(deviceModel = "ZSE43", firmwareVersion = "2.00"), catalog
             ).status shouldBe FirmwareStatus.CHECK_MANUALLY
+
+            // Leviton DZ6HD runs a generic driver with no deviceModel; it must
+            // match via its (manufacturer, deviceType, deviceId) triple.
+            val dz6hd = FirmwareOperations.classify(
+                device(
+                    driverType = "Generic Z-Wave CentralScene Dimmer", firmwareVersion = "1.13",
+                    manufacturer = 29, deviceType = 13569, productId = 1
+                ),
+                catalog
+            )
+            dz6hd.status shouldBe FirmwareStatus.UPDATE_AVAILABLE
+            dz6hd.entry?.model shouldBe "DZ6HD"
+            dz6hd.line?.latest shouldBe "1.22"
         }
     }
 

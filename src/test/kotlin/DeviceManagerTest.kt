@@ -162,6 +162,45 @@ class DeviceManagerTest {
     }
 
     @Test
+    fun `test refresh updates the device command set`() {
+        // Boot with only sensors: no actuator commands exist yet.
+        val sensorsOnly = """
+            [
+                {"id": 1, "label": "Front Door", "type": "Generic Zigbee Contact Sensor"}
+            ]
+        """.trimIndent()
+        val withActuator = """
+            [
+                {"id": 1, "label": "Front Door", "type": "Generic Zigbee Contact Sensor"},
+                {"id": 2, "label": "Kitchen Lights", "type": "Virtual Switch"}
+            ]
+        """.trimIndent()
+
+        val manager = DeviceManager(sensorsOnly)
+        assertFalse(manager.isDeviceCommand("on"))
+
+        manager.refreshDevices(withActuator)
+
+        assertTrue(manager.isDeviceCommand("on"))
+        assertTrue(manager.findDevice("kitchen lights", "on").isSuccess)
+    }
+
+    @Test
+    fun `test duplicate labels surface in refresh warnings`() {
+        val json = """
+            [
+                {"id": 1, "label": "Hall Light", "type": "Virtual Switch"},
+                {"id": 2, "label": "Hall Light", "type": "Virtual Switch"}
+            ]
+        """.trimIndent()
+
+        val (count, warnings) = DeviceManager(json).refreshDevices(json)
+
+        assertEquals(2, count)
+        assertTrue(warnings.any { it.contains("Duplicate key found in cache") })
+    }
+
+    @Test
     fun `test list tables escape backtick and backslash in labels`() {
         // The only two characters that can break a MarkdownV2 code fence.
         val json = """

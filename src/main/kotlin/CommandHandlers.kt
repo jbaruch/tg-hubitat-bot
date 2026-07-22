@@ -3,6 +3,7 @@ package jbaru.ch.telegram.hubitat
 import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.Message
+import io.ktor.http.isSuccess
 import jbaru.ch.telegram.hubitat.model.Device
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -104,7 +105,12 @@ object CommandHandlers {
             "http://${defaultHubIp}/apps/api/${makerApiAppId}/hsm/cancelAlerts",
             mapOf("access_token" to makerApiToken)
         )
-        return response.status.description
+        return if (response.status.isSuccess()) {
+            "HSM alerts cancelled."
+        } else {
+            "Failed to cancel alerts: HTTP ${response.status}. " +
+                "Check that Maker API control of HSM is allowed and the hub is reachable, then retry."
+        }
     }
     
     suspend fun handleGetOpenSensorsCommand(
@@ -221,7 +227,17 @@ object CommandHandlers {
             "http://${defaultHubIp}$fullPath",
             mapOf("access_token" to makerApiToken)
         )
-        return response.status.description
+        // A raw HTTP reason phrase ("Not Found") reads like noise, and a non-2xx
+        // used to be reported in the same voice as success. Say what happened,
+        // in the snake_case form the user actually typed.
+        val displayCommand = command.camelToSnakeCase()
+        val argSuffix = if (args.isEmpty()) "" else " ${args.joinToString(" ")}"
+        return if (response.status.isSuccess()) {
+            "Done: ${device.label} → $displayCommand$argSuffix"
+        } else {
+            "Failed: ${device.label} → $displayCommand$argSuffix returned HTTP ${response.status}. " +
+                "Check that the device is reachable and exposed in Maker API, then retry."
+        }
     }
     
     private suspend fun getDeviceAttribute(

@@ -1,7 +1,9 @@
 package jbaru.ch.telegram.hubitat
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -32,6 +34,34 @@ class NetworkClientTest : FunSpec({
             )
 
             response.status shouldBe HttpStatusCode.OK
+        }
+
+        test("getBody returns the body on success") {
+            val mockEngine = MockEngine {
+                respond(
+                    content = ByteReadChannel("""{"status": "success"}"""),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf("Content-Type" to listOf("application/json"))
+                )
+            }
+
+            val client = KtorNetworkClient(HttpClient(mockEngine))
+            client.getBody("http://test.com/api") shouldBe """{"status": "success"}"""
+        }
+
+        test("getBody throws on a non-2xx status instead of returning the error page") {
+            val mockEngine = MockEngine {
+                respond(
+                    content = ByteReadChannel("<html>Not Found</html>"),
+                    status = HttpStatusCode.NotFound
+                )
+            }
+
+            val client = KtorNetworkClient(HttpClient(mockEngine))
+            val exception = shouldThrow<IllegalStateException> {
+                client.getBody("http://test.com/api")
+            }
+            exception.message shouldContain "404"
         }
     }
 

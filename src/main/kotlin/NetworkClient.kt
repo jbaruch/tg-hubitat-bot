@@ -6,6 +6,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 import org.slf4j.LoggerFactory
 
 interface NetworkClient {
@@ -30,6 +31,18 @@ class KtorNetworkClient(private val client: HttpClient) : NetworkClient {
     override suspend fun getBody(url: String, params: Map<String, String>): String {
         logger.info("HTTP GET (body): $url with params: ${redact(params)}")
         val response = get(url, params)
+        // An error page must never reach a JSON parser looking like data. Callers
+        // that expect mid-operation failures (hub rebooting during /update) catch
+        // this and treat it as "not ready yet".
+        if (!response.status.isSuccess()) {
+            // The URL stays in the logs: handlers format e.message into chat
+            // replies, and internal endpoints don't belong there.
+            logger.warn("GET $url failed: HTTP ${response.status}")
+            throw IllegalStateException(
+                "Hub request failed: HTTP ${response.status}. " +
+                    "Check that the hub is reachable and the Maker API app id/token are valid, then retry."
+            )
+        }
         val body = response.body<String>()
         if (isSecretResponse(url)) {
             logger.info("HTTP Response body (${body.length} chars): [REDACTED]")

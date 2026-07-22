@@ -1,5 +1,23 @@
 # Changes Log
 
+## Handler Failure Replies, HTTP Status Checking, and /list Escaping
+
+### Overview
+Every command now answers the chat even when the hub or network fails, device/HSM command results reflect the real HTTP outcome, and /list can no longer be broken by a code-fence-breaking character in a device label.
+
+### Changes Made
+- Wrapped every single-reply handler in a dispatcher-boundary guard: an uncaught exception is logged with its stack and answered with a short, stable error message instead of dying silently
+- Device commands reply with human text in the form users type ("Done: Kitchen Lights → set_level 50"); non-2xx responses read as failures ("Failed: … returned HTTP 404") instead of raw HTTP reason phrases
+- /cancel_alerts reports "HSM alerts cancelled." on success and a clear failure line otherwise
+- NetworkClient.getBody treats non-2xx responses as errors (URL kept in logs, not in the chat-visible message) so error pages never reach a JSON parser looking like data
+- /list escapes backtick and backslash in device labels and aliases - the only two characters that are special inside a MarkdownV2 code fence
+- /update's final failure reply is a stable summary; per-hub detail still arrives via progress messages and full details stay in the logs
+
+### Benefits
+- The bot never looks dead when the hub is flaky - every command gets an answer
+- Failures are visibly failures, successes read like something a human would say
+- Internal endpoints and exception internals stay out of the Telegram chat
+
 ## Improved EweLink Address Resolution Error Handling
 
 ### Overview

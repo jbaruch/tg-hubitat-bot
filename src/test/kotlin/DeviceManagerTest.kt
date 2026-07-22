@@ -160,4 +160,22 @@ class DeviceManagerTest {
         assertEquals(1, count)
         assertTrue(warnings.any { it.startsWith("WARNING Skipping unsupported device") })
     }
+
+    @Test
+    fun `test list tables escape backtick and backslash in labels`() {
+        // The only two characters that can break a MarkdownV2 code fence.
+        val json = """
+            [
+                {"id": 1, "label": "Weird `Tick` Device", "type": "Virtual Switch"},
+                {"id": 2, "label": "Back\\slash Device", "type": "Virtual Switch"}
+            ]
+        """.trimIndent()
+
+        val tables = DeviceManager(json).listByType()
+        val actuators = tables.getValue("Actuators")
+
+        assertTrue(actuators.contains("Weird \\`Tick\\` Device"))
+        assertTrue(actuators.contains("Back\\\\slash Device"))
+        assertFalse(actuators.contains("Weird `Tick` Device"))
+    }
 }

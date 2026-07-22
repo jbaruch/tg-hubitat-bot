@@ -24,4 +24,15 @@ class StringUtilsTest : FunSpec({
     test("snakeToCamelCase with consecutive underscores should handle empty tokens") {
         "hello__world".snakeToCamelCase() shouldBe "helloWorld"
     }
+
+    test("camelToSnakeCase converts camelCase back to snake_case") {
+        "setLevel".camelToSnakeCase() shouldBe "set_level"
+        "doubleTap".camelToSnakeCase() shouldBe "double_tap"
+        "on".camelToSnakeCase() shouldBe "on"
+        "".camelToSnakeCase() shouldBe ""
+    }
+
+    test("camelToSnakeCase round-trips snakeToCamelCase") {
+        "cancel_alerts".snakeToCamelCase().camelToSnakeCase() shouldBe "cancel_alerts"
+    }
 })

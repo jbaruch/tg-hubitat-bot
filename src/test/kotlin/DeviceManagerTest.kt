@@ -201,6 +201,29 @@ class DeviceManagerTest {
     }
 
     @Test
+    fun `test never-diverging labels boot with warnings instead of hanging`() {
+        // "az" forces "ab" to fully expand into "a b"'s abbreviation; both are
+        // fully expanded and can never diverge - this used to loop forever
+        // inside DeviceAbbreviator and hang the bot at boot.
+        val json = """
+            [
+                {"id": 1, "label": "a b", "type": "Virtual Switch"},
+                {"id": 2, "label": "ab", "type": "Virtual Switch"},
+                {"id": 3, "label": "az", "type": "Virtual Switch"}
+            ]
+        """.trimIndent()
+
+        val manager = DeviceManager(json)
+        val (count, warnings) = manager.refreshDevices(json)
+
+        assertEquals(3, count)
+        assertTrue(warnings.any { it.contains("was not abbreviated") })
+        // Both devices stay reachable by full name.
+        assertTrue(manager.findDevice("a b", "on").isSuccess)
+        assertTrue(manager.findDevice("ab", "on").isSuccess)
+    }
+
+    @Test
     fun `test list tables escape backtick and backslash in labels`() {
         // The only two characters that can break a MarkdownV2 code fence.
         val json = """

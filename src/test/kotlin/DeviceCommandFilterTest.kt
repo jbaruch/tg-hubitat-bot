@@ -7,46 +7,66 @@ import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 
 class DeviceCommandFilterTest : FunSpec({
-    
+
     lateinit var deviceManager: DeviceManager
     lateinit var filter: DeviceCommandFilter
-    
+
     beforeEach {
-        // Create a mock device manager with some known commands
         deviceManager = mock {
             on { isDeviceCommand("on") } doReturn true
             on { isDeviceCommand("off") } doReturn true
+            on { isDeviceCommand("setLevel") } doReturn true
             on { isDeviceCommand("cancelAlerts") } doReturn false
             on { isDeviceCommand("unknown") } doReturn false
         }
-        // Note: DeviceCommandFilter uses the global deviceManager, so we can't easily inject it
-        // These tests verify the filter logic structure
+        filter = DeviceCommandFilter { deviceManager }
     }
-    
-    test("should return false for system command") {
-        val message = mock<Message> {
-            on { text } doReturn "/cancel_alerts"
-        }
-        
-        // System commands like cancel_alerts should not be device commands
-        // This test verifies the structure, actual behavior depends on deviceManager state
+
+    fun messageWithText(value: String?): Message = mock {
+        on { text } doReturn value
     }
-    
-    test("should return false for null message text") {
-        val message = mock<Message> {
-            on { text } doReturn null
-        }
-        
-        // Null text should return false
-        // This test verifies the filter handles null gracefully
+
+    fun matches(text: String?): Boolean = with(filter) {
+        messageWithText(text).predicate()
     }
-    
-    test("should return false for empty message text") {
-        val message = mock<Message> {
-            on { text } doReturn ""
-        }
-        
-        // Empty text should return false
-        // This test verifies the filter handles empty strings
+
+    test("matches a device command with a leading slash") {
+        matches("/on kitchen") shouldBe true
+    }
+
+    test("converts snake_case commands before lookup") {
+        matches("/set_level kitchen 50") shouldBe true
+    }
+
+    test("does not match without a leading slash") {
+        matches("on kitchen") shouldBe false
+    }
+
+    test("does not match system commands") {
+        matches("/cancel_alerts") shouldBe false
+    }
+
+    test("does not match unknown commands") {
+        matches("/unknown kitchen") shouldBe false
+    }
+
+    test("does not match null text") {
+        matches(null) shouldBe false
+    }
+
+    test("does not match empty text") {
+        matches("") shouldBe false
+    }
+
+    test("does not match a bare slash") {
+        matches("/") shouldBe false
+    }
+
+    test("matches the group-chat mention form") {
+        matches("/on@MyHomeBot kitchen") shouldBe true
+    }
+
+    test("does not match a mention of an unknown command") {
+        matches("/unknown@MyHomeBot kitchen") shouldBe false
     }
 })

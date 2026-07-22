@@ -62,7 +62,8 @@ fun main() {
 
         dispatch {
 
-            message(DeviceCommandFilter()) {
+            message(DeviceCommandFilter { deviceManager }) {
+                if (!isAuthorized(message)) return@message
                 val result = runBlocking {
                     CommandHandlers.handleDeviceCommand(
                         bot, message, deviceManager, networkClient,
@@ -73,6 +74,7 @@ fun main() {
             }
 
             command("cancel_alerts") {
+                if (!isAuthorized(message)) return@command
                 val result = runBlocking {
                     CommandHandlers.handleCancelAlertsCommand(
                         networkClient, config.makerApiAppId, config.makerApiToken, config.defaultHubIp
@@ -82,6 +84,7 @@ fun main() {
             }
             
             command("update") {
+                if (!isAuthorized(message)) return@command
                 val result = runBlocking {
                     HubOperations.updateHubsWithPolling(
                         hubs,
@@ -107,6 +110,7 @@ fun main() {
             }
             
             command("firmware") {
+                if (!isAuthorized(message)) return@command
                 val chatId = ChatId.fromId(message.chat.id)
                 val messages = runBlocking {
                     try {
@@ -120,6 +124,7 @@ fun main() {
             }
 
             command("refresh") {
+                if (!isAuthorized(message)) return@command
                 val refreshResults = runBlocking {
                     val results = CommandHandlers.handleRefreshCommand(
                         deviceManager, networkClient,
@@ -140,6 +145,7 @@ fun main() {
             }
             
             command("list") {
+                if (!isAuthorized(message)) return@command
                 val chatId = ChatId.fromId(message.chat.id)
                 val deviceLists = runBlocking {
                     CommandHandlers.handleListCommand(deviceManager)
@@ -154,6 +160,7 @@ fun main() {
             }
 
             command("get_open_sensors") {
+                if (!isAuthorized(message)) return@command
                 val response = runBlocking {
                     CommandHandlers.handleGetOpenSensorsCommand(
                         deviceManager, networkClient,
@@ -164,6 +171,7 @@ fun main() {
             }
             
             command("get_mode") {
+                if (!isAuthorized(message)) return@command
                 val result = runBlocking {
                     CommandHandlers.handleGetModeCommand(
                         networkClient, config.makerApiAppId,
@@ -174,6 +182,7 @@ fun main() {
             }
             
             command("list_modes") {
+                if (!isAuthorized(message)) return@command
                 val result = runBlocking {
                     CommandHandlers.handleListModesCommand(
                         networkClient, config.makerApiAppId,
@@ -184,6 +193,7 @@ fun main() {
             }
             
             command("set_mode") {
+                if (!isAuthorized(message)) return@command
                 val result = runBlocking {
                     CommandHandlers.handleSetModeCommand(
                         message, networkClient, config.makerApiAppId,
@@ -193,6 +203,13 @@ fun main() {
                 bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = result)
             }
         }
+    }
+
+    if (config.allowedChatIds.isEmpty()) {
+        logger.warn(
+            "No ALLOWED_CHAT_IDS or CHAT_ID configured - the bot will accept commands from ANY chat. " +
+                "Set ALLOWED_CHAT_IDS to lock it down."
+        )
     }
 
     val startupMessage = "Init successful, ${deviceManager.deviceCount} devices loaded, start polling"
@@ -213,9 +230,25 @@ private suspend fun getDevicesJson(): String =
     )
 
 
-class DeviceCommandFilter : Filter {
+private fun isAuthorized(message: Message): Boolean {
+    val allowed = config.isChatAllowed(message.chat.id)
+    if (!allowed) {
+        logger.warn(
+            "Dropping command from unauthorized chat {} (user {}): {}",
+            message.chat.id, message.from?.id, message.text
+        )
+    }
+    return allowed
+}
+
+class DeviceCommandFilter(private val deviceManagerProvider: () -> DeviceManager) : Filter {
     override fun Message.predicate(): Boolean {
-        val command = text?.split(" ")?.firstOrNull()?.removePrefix("/")
-        return command != null && deviceManager.isDeviceCommand(command.snakeToCamelCase())
+        // Only explicit commands qualify: a leading slash is required so plain
+        // chat text ("on kitchen") is never interpreted as a device command.
+        val firstToken = text?.split(" ")?.firstOrNull() ?: return false
+        if (!firstToken.startsWith("/")) return false
+        // In group chats commands arrive as /on@BotName - strip the mention.
+        val command = firstToken.removePrefix("/").substringBefore("@")
+        return command.isNotEmpty() && deviceManagerProvider().isDeviceCommand(command.snakeToCamelCase())
     }
 }

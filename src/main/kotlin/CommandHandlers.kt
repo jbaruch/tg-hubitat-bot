@@ -27,7 +27,8 @@ object CommandHandlers {
             return "Please specify a device name for the command."
         }
 
-        val snakeCaseCommand = parts[0].removePrefix("/")
+        // Strip the group-chat mention form (/on@BotName) to the bare command.
+        val snakeCaseCommand = parts[0].removePrefix("/").substringBefore("@")
         val camelCaseCommand = snakeCaseCommand.snakeToCamelCase()
         val deviceName = parts[1]
         val args = parts.drop(2)

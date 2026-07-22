@@ -1,5 +1,19 @@
 # Changes Log
 
+## Boot No Longer Hangs on Irreconcilable Device-Name Abbreviations
+
+### Overview
+Device labels whose abbreviations can never become unique used to spin the abbreviator forever and the bot never finished booting.
+
+### Changes Made
+- Collision groups that are fully expanded and still identical are dropped from abbreviation with a visible "was not abbreviated" warning; the devices stay reachable by full name
+- Abbreviation lookups are case-insensitive, matching how names are stored
+- A dropped name reports a dedicated "cannot be abbreviated" reason instead of a misleading "was not added"
+
+### Benefits
+- Boot always completes, whatever the device labels look like
+- Clear warnings instead of a silent hang
+
 ## Refresh Consistency and Thread-Safe Device State
 
 ### Overview

@@ -101,8 +101,11 @@ fun main() {
                     ).fold(
                         onSuccess = { it },
                         onFailure = {
+                            // The per-hub detail already reached the chat via
+                            // progressCallback; the exception text can carry
+                            // internal URLs, so it stays in the logs.
                             logger.error("Hub update failed", it)
-                            it.message.toString()
+                            "Hub update failed. See the progress messages above; details are in the bot logs."
                         }
                     )
                 }

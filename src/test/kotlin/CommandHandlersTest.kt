@@ -44,7 +44,7 @@ class CommandHandlersTest : FunSpec({
                 makerApiAppId, makerApiToken, defaultHubIp
             )
             
-            result shouldBe "OK"
+            result shouldBe "Done: Kitchen Light → on"
         }
         
         test("should return error when command has missing arguments") {
@@ -140,7 +140,29 @@ class CommandHandlersTest : FunSpec({
                 makerApiAppId, makerApiToken, defaultHubIp
             )
 
-            result shouldBe "OK"
+            result shouldBe "Done: Button → push 1"
+        }
+
+        test("should report failure when the hub returns a non-2xx status") {
+            val message = mock<Message> {
+                on { text } doReturn "/on kitchen_light"
+            }
+            val device = Device.VirtualSwitch(1, "Kitchen Light")
+            whenever(deviceManager.findDevice(eq("kitchen_light"), eq("on")))
+                .thenReturn(Result.success(device))
+
+            val mockResponse = mock<HttpResponse> {
+                on { status } doReturn HttpStatusCode.NotFound
+            }
+            whenever(networkClient.get(any(), any())).thenReturn(mockResponse)
+
+            val result = CommandHandlers.handleDeviceCommand(
+                bot, message, deviceManager, networkClient,
+                makerApiAppId, makerApiToken, defaultHubIp
+            )
+
+            result shouldContain "Failed: Kitchen Light"
+            result shouldContain "404"
         }
     }
     
@@ -210,7 +232,7 @@ class CommandHandlersTest : FunSpec({
                 networkClient, makerApiAppId, makerApiToken, defaultHubIp
             )
             
-            result shouldBe "OK"
+            result shouldBe "HSM alerts cancelled."
         }
         
         test("should return error status when HSM command fails") {
@@ -223,7 +245,8 @@ class CommandHandlersTest : FunSpec({
                 networkClient, makerApiAppId, makerApiToken, defaultHubIp
             )
             
-            result shouldBe "Internal Server Error"
+            result shouldContain "Failed to cancel alerts"
+            result shouldContain "500"
         }
     }
     

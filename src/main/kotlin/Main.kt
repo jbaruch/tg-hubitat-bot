@@ -64,28 +64,26 @@ fun main() {
 
             message(DeviceCommandFilter { deviceManager }) {
                 if (!isAuthorized(message)) return@message
-                val result = runBlocking {
+                replyTo(bot, message) {
                     CommandHandlers.handleDeviceCommand(
                         bot, message, deviceManager, networkClient,
                         config.makerApiAppId, config.makerApiToken, config.defaultHubIp
                     )
                 }
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = result)
             }
 
             command("cancel_alerts") {
                 if (!isAuthorized(message)) return@command
-                val result = runBlocking {
+                replyTo(bot, message) {
                     CommandHandlers.handleCancelAlertsCommand(
                         networkClient, config.makerApiAppId, config.makerApiToken, config.defaultHubIp
                     )
                 }
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = result)
             }
-            
+
             command("update") {
                 if (!isAuthorized(message)) return@command
-                val result = runBlocking {
+                replyTo(bot, message) {
                     HubOperations.updateHubsWithPolling(
                         hubs,
                         networkClient,
@@ -98,17 +96,16 @@ fun main() {
                                 text = progressMessage
                             )
                         }
+                    ).fold(
+                        onSuccess = { it },
+                        onFailure = {
+                            logger.error("Hub update failed", it)
+                            it.message.toString()
+                        }
                     )
                 }
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = result.fold(
-                    onSuccess = { it },
-                    onFailure = {
-                        logger.error("Hub update failed", it)
-                        it.message.toString()
-                    }
-                ))
             }
-            
+
             command("firmware") {
                 if (!isAuthorized(message)) return@command
                 val chatId = ChatId.fromId(message.chat.id)
@@ -125,7 +122,7 @@ fun main() {
 
             command("refresh") {
                 if (!isAuthorized(message)) return@command
-                val refreshResults = runBlocking {
+                replyTo(bot, message) {
                     val results = CommandHandlers.handleRefreshCommand(
                         deviceManager, networkClient,
                         config.makerApiAppId, config.makerApiToken, config.defaultHubIp
@@ -136,71 +133,68 @@ fun main() {
                         deviceManager, networkClient, config.defaultHubIp,
                         config.makerApiAppId, config.makerApiToken
                     )
-                    results
+                    "Refresh finished, ${results.first} devices loaded. Warnings: ${results.second}"
                 }
-                bot.sendMessage(
-                    chatId = ChatId.fromId(message.chat.id),
-                    text = "Refresh finished, ${refreshResults.first} devices loaded. Warnings: ${refreshResults.second}"
-                )
             }
-            
+
             command("list") {
                 if (!isAuthorized(message)) return@command
                 val chatId = ChatId.fromId(message.chat.id)
-                val deviceLists = runBlocking {
-                    CommandHandlers.handleListCommand(deviceManager)
-                }
-                deviceLists.forEach { (type, table) ->
-                    bot.sendMessage(
-                        chatId = chatId,
-                        text = "*$type*:\n$table",
-                        parseMode = MARKDOWN_V2
-                    )
+                try {
+                    val deviceLists = runBlocking {
+                        CommandHandlers.handleListCommand(deviceManager)
+                    }
+                    deviceLists.forEach { (type, table) ->
+                        bot.sendMessage(
+                            chatId = chatId,
+                            text = "*$type*:\n$table",
+                            parseMode = MARKDOWN_V2
+                        )
+                    }
+                } catch (e: Exception) {
+                    logger.error("List command failed", e)
+                    bot.sendMessage(chatId = chatId, text = "Error listing devices: ${e.message ?: e.javaClass.simpleName}")
                 }
             }
 
             command("get_open_sensors") {
                 if (!isAuthorized(message)) return@command
-                val response = runBlocking {
+                replyTo(bot, message) {
                     CommandHandlers.handleGetOpenSensorsCommand(
                         deviceManager, networkClient,
                         config.makerApiAppId, config.makerApiToken, config.defaultHubIp
                     )
                 }
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = response)
             }
-            
+
             command("get_mode") {
                 if (!isAuthorized(message)) return@command
-                val result = runBlocking {
+                replyTo(bot, message) {
                     CommandHandlers.handleGetModeCommand(
                         networkClient, config.makerApiAppId,
                         config.makerApiToken, config.defaultHubIp
                     )
                 }
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = result)
             }
-            
+
             command("list_modes") {
                 if (!isAuthorized(message)) return@command
-                val result = runBlocking {
+                replyTo(bot, message) {
                     CommandHandlers.handleListModesCommand(
                         networkClient, config.makerApiAppId,
                         config.makerApiToken, config.defaultHubIp
                     )
                 }
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = result)
             }
-            
+
             command("set_mode") {
                 if (!isAuthorized(message)) return@command
-                val result = runBlocking {
+                replyTo(bot, message) {
                     CommandHandlers.handleSetModeCommand(
                         message, networkClient, config.makerApiAppId,
                         config.makerApiToken, config.defaultHubIp
                     )
                 }
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = result)
             }
         }
     }
@@ -229,6 +223,21 @@ private suspend fun getDevicesJson(): String =
         mapOf("access_token" to config.makerApiToken)
     )
 
+
+/**
+ * Runs a handler body and always answers the chat: an uncaught exception from
+ * a handler used to die inside the dispatcher, leaving the user staring at a
+ * bot that looks dead whenever the hub or network hiccuped.
+ */
+private fun replyTo(bot: Bot, message: Message, block: suspend () -> String) {
+    val text = try {
+        runBlocking { block() }
+    } catch (e: Exception) {
+        logger.error("Handler for '${message.text}' failed", e)
+        "Error handling '${message.text}': ${e.message ?: e.javaClass.simpleName}"
+    }
+    bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = text)
+}
 
 private fun isAuthorized(message: Message): Boolean {
     val allowed = config.isChatAllowed(message.chat.id)

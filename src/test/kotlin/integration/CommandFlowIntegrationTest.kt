@@ -78,7 +78,7 @@ class CommandFlowIntegrationTest : FunSpec({
             defaultHubIp = "192.168.1.100"
         )
         
-        result shouldBe "OK"
+        result shouldBe "Done: Living Room Light → on"
     }
     
     test("device command flow - device not found") {
@@ -179,7 +179,7 @@ class CommandFlowIntegrationTest : FunSpec({
             defaultHubIp = "192.168.1.100"
         )
         
-        result shouldBe "OK"
+        result shouldBe "HSM alerts cancelled."
     }
     
     test("get open sensors command flow - with open sensors") {

@@ -76,8 +76,8 @@ class DeviceManager(deviceListJson: String) {
 
         // Group aliases by device and find maximum lengths
         deviceCache.forEach { (alias, device) ->
-            deviceToAliases.getOrPut(device) { mutableListOf() }.add(alias)
-            maxDeviceNameLength = maxOf(maxDeviceNameLength, device.label.length)
+            deviceToAliases.getOrPut(device) { mutableListOf() }.add(escapeMarkdownCode(alias))
+            maxDeviceNameLength = maxOf(maxDeviceNameLength, escapeMarkdownCode(device.label).length)
             maxAliasesLength = maxOf(maxAliasesLength, deviceToAliases[device]!!.joinToString(", ").length)
         }
 
@@ -95,7 +95,7 @@ class DeviceManager(deviceListJson: String) {
         deviceToAliases.forEach { (device, aliases) ->
             val aliasesString = aliases.joinToString(", ")
             tableBuilder.appendLine(
-                "| ${device.label.padEnd(maxDeviceNameLength)} | ${
+                "| ${escapeMarkdownCode(device.label).padEnd(maxDeviceNameLength)} | ${
                     aliasesString.padEnd(
                         maxAliasesLength
                     )
@@ -129,8 +129,8 @@ class DeviceManager(deviceListJson: String) {
             // Group aliases by device and find maximum lengths for this type
             deviceCache.forEach { (alias, device) ->
                 if (devices.contains(device)) {
-                    deviceToAliases.getOrPut(device) { mutableListOf() }.add(alias)
-                    maxDeviceNameLength = maxOf(maxDeviceNameLength, device.label.length)
+                    deviceToAliases.getOrPut(device) { mutableListOf() }.add(escapeMarkdownCode(alias))
+                    maxDeviceNameLength = maxOf(maxDeviceNameLength, escapeMarkdownCode(device.label).length)
                     maxAliasesLength = maxOf(maxAliasesLength, deviceToAliases[device]!!.joinToString(", ").length)
                 }
             }
@@ -147,7 +147,7 @@ class DeviceManager(deviceListJson: String) {
 
                 deviceToAliases.forEach { (device, aliases) ->
                     val aliasesString = aliases.joinToString(", ")
-                    appendLine("| ${device.label.padEnd(maxDeviceNameLength)} | ${aliasesString.padEnd(maxAliasesLength)} |")
+                    appendLine("| ${escapeMarkdownCode(device.label).padEnd(maxDeviceNameLength)} | ${aliasesString.padEnd(maxAliasesLength)} |")
                 }
 
                 appendLine("+" + "-".repeat(maxDeviceNameLength + 2) + "+" + "-".repeat(maxAliasesLength + 2) + "+")
@@ -200,6 +200,12 @@ class DeviceManager(deviceListJson: String) {
         deviceCache[key] = device
         return warnings
     }
+
+    // The /list tables render inside MarkdownV2 code fences, where every
+    // character is literal EXCEPT backslash and backtick - those two are the
+    // only ones that can break the fence and fail the whole sendMessage.
+    private fun escapeMarkdownCode(s: String): String =
+        s.replace("\\", "\\\\").replace("`", "\\`")
 
     private fun removeLightSuffix(name: String): String {
         return name.replace(Regex(" lights?$", RegexOption.IGNORE_CASE), "").trim()

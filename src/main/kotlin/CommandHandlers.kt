@@ -29,25 +29,50 @@ object CommandHandlers {
 
         val snakeCaseCommand = parts[0].removePrefix("/")
         val camelCaseCommand = snakeCaseCommand.snakeToCamelCase()
-        val deviceName = parts[1]
-        val args = parts.drop(2)
+        val tokens = parts.drop(1)
+        val fullQuery = tokens.joinToString(" ")
 
-        return deviceManager.findDevice(deviceName, camelCaseCommand).fold(
-            onSuccess = { device ->
-                val argCount = device.supportedOps[camelCaseCommand]
-                if (argCount == null) {
-                    "Command '/$snakeCaseCommand' is not supported by device '${device.label}'"
-                } else if (args.size != argCount) {
-                    "Invalid number of arguments for /$snakeCaseCommand. Expected $argCount argument(s)."
-                } else {
-                    runDeviceCommand(device, camelCaseCommand, args, networkClient, makerApiAppId, makerApiToken, defaultHubIp)
+        // Device labels are multi-word ("Kitchen Lights", "Front Door Button"),
+        // so the device/args boundary is not fixed. Try the longest possible
+        // name first and shrink until a known device with the right trailing
+        // argument count matches; the longest match wins so a device whose name
+        // prefixes another's never steals the query.
+        var mismatchError: String? = null
+        var unsupportedError: String? = null
+
+        for (i in tokens.size downTo 1) {
+            val name = tokens.take(i).joinToString(" ")
+            val args = tokens.drop(i)
+            deviceManager.findDevice(name, camelCaseCommand).fold(
+                onSuccess = { device ->
+                    val argCount = device.supportedOps[camelCaseCommand]
+                    if (argCount == null) {
+                        if (unsupportedError == null) {
+                            unsupportedError =
+                                "Command '/$snakeCaseCommand' is not supported by device '${device.label}'"
+                        }
+                    } else if (args.size == argCount) {
+                        return runDeviceCommand(
+                            device, camelCaseCommand, args,
+                            networkClient, makerApiAppId, makerApiToken, defaultHubIp
+                        )
+                    } else if (mismatchError == null) {
+                        mismatchError =
+                            "Invalid number of arguments for /$snakeCaseCommand. Expected $argCount argument(s)."
+                    }
+                },
+                onFailure = {
+                    val message = it.message ?: ""
+                    if (message.contains("not supported") && unsupportedError == null) {
+                        unsupportedError = message
+                    }
                 }
-            },
-            onFailure = {
-                logger.warn("Device command '{}' failed: {}", snakeCaseCommand, it.message)
-                it.message.toString()
-            }
-        )
+            )
+        }
+
+        val error = mismatchError ?: unsupportedError ?: "No device found for query: $fullQuery"
+        logger.warn("Device command '{}' failed: {}", snakeCaseCommand, error)
+        return error
     }
     
     suspend fun handleListCommand(deviceManager: DeviceManager): Map<String, String> {

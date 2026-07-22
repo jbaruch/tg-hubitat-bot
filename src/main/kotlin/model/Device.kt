@@ -3,6 +3,18 @@
 package jbaru.ch.telegram.hubitat.model
 import kotlinx.serialization.*
 
+// Shared constants behind the getter-only overrides: the getters keep these
+// type-level tables out of serialization, the constants keep every access from
+// allocating a fresh map.
+private val ACTUATOR_OPS = mapOf("on" to 0, "off" to 0)
+private val DIMMER_OPS = mapOf("on" to 0, "off" to 0, "setLevel" to 1)
+private val BUTTON_OPS = mapOf("doubleTap" to 1, "hold" to 1, "push" to 1, "release" to 1)
+private val SHADE_OPS = mapOf("open" to 0, "close" to 0)
+private val HUB_OPS = mapOf("reboot" to 0)
+private val CONTACT_ATTRIBUTES = mapOf("contact" to listOf("open", "closed"))
+private val NO_OPS = emptyMap<String, Int>()
+private val NO_ATTRIBUTES = emptyMap<String, List<String>>()
+
 @Serializable
 sealed class Device {
     abstract val id: Int
@@ -12,31 +24,36 @@ sealed class Device {
 
     @Serializable
     sealed class Actuator() : Device() {
-        override val supportedOps: Map<String, Int> = mapOf("on" to 0, "off" to 0)
-        override val attributes: Map<String, List<String>> = emptyMap()
+        override val supportedOps: Map<String, Int> get() = ACTUATOR_OPS
+        override val attributes: Map<String, List<String>> get() = NO_ATTRIBUTES
 
+    }
+
+    @Serializable
+    sealed class Dimmer() : Actuator() {
+        override val supportedOps: Map<String, Int> get() = DIMMER_OPS
     }
 
     @Serializable
     sealed class Button() : Device() {
-        override val supportedOps: Map<String, Int> = mapOf("doubleTap" to 1, "hold" to 1, "push" to 1, "release" to 1)
-        override val attributes: Map<String, List<String>> = emptyMap()
+        override val supportedOps: Map<String, Int> get() = BUTTON_OPS
+        override val attributes: Map<String, List<String>> get() = NO_ATTRIBUTES
     }
 
     @Serializable
     sealed class Shade() : Device() {
-        override val supportedOps: Map<String, Int> = mapOf("open" to 0, "close" to 0)
-        override val attributes: Map<String, List<String>> = emptyMap()
+        override val supportedOps: Map<String, Int> get() = SHADE_OPS
+        override val attributes: Map<String, List<String>> get() = NO_ATTRIBUTES
     }
 
     @Serializable
     sealed class Sensor() : Device() {
-        override val supportedOps: Map<String, Int> = emptyMap()
+        override val supportedOps: Map<String, Int> get() = NO_OPS
     }
 
     @Serializable
     sealed class ContactSensor() : Sensor() {
-        override val attributes: Map<String, List<String>> = mapOf("contact" to listOf("open", "closed"))
+        override val attributes: Map<String, List<String>> get() = CONTACT_ATTRIBUTES
     }
 
     @Serializable
@@ -55,8 +72,8 @@ sealed class Device {
         var managementToken: String = "",
         var ip: String = ""
     ) : Device() {
-        override val supportedOps: Map<String, Int> = mapOf("reboot" to 0)
-        override val attributes: Map<String, List<String>> = emptyMap()
+        override val supportedOps: Map<String, Int> get() = HUB_OPS
+        override val attributes: Map<String, List<String>> get() = NO_ATTRIBUTES
     }
 
     @Serializable
@@ -73,11 +90,11 @@ sealed class Device {
 
     @Serializable
     @SerialName("Room Lights Activator Dimmer")
-    data class RoomLightsActivatorDimmer(override val id: Int, override val label: String) : Actuator()
+    data class RoomLightsActivatorDimmer(override val id: Int, override val label: String) : Dimmer()
 
     @Serializable
     @SerialName("Room Lights Activator Bulb")
-    data class RoomLightsActivatorBulb(override val id: Int, override val label: String) : Actuator()
+    data class RoomLightsActivatorBulb(override val id: Int, override val label: String) : Dimmer()
 
     @Serializable
     @SerialName("Generic Zigbee Outlet")
@@ -85,11 +102,11 @@ sealed class Device {
 
     @Serializable
     @SerialName("Zooz Zen27 Central Scene Dimmer")
-    data class ZoozDimmer(override val id: Int, override val label: String) : Actuator()
+    data class ZoozDimmer(override val id: Int, override val label: String) : Dimmer()
 
     @Serializable
     @SerialName("Zooz ZEN Dimmer Advanced")
-    data class ZoozZenDimmerAdvanced(override val id: Int, override val label: String) : Actuator()
+    data class ZoozZenDimmerAdvanced(override val id: Int, override val label: String) : Dimmer()
 
     @Serializable
     @SerialName("Zooz Zen76 S2 Switch")

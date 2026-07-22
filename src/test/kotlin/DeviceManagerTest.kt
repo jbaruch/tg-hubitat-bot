@@ -162,6 +162,20 @@ class DeviceManagerTest {
     }
 
     @Test
+    fun `test dimmer supports setLevel and plain switch does not`() {
+        // Kitchen Lights is a Room Lights Activator Dimmer in the fixture.
+        val dimmer = deviceManager.findDevice("Kitchen Lights", "setLevel")
+        assertTrue(dimmer.isSuccess)
+
+        val switch = deviceManager.findDevice("Garage Door", "setLevel")
+        assertTrue(switch.isFailure)
+        assertEquals(
+            "Command 'setLevel' is not supported by device 'Garage Door'",
+            switch.exceptionOrNull()?.message
+        )
+    }
+
+    @Test
     fun `test refresh updates the device command set`() {
         // Boot with only sensors: no actuator commands exist yet.
         val sensorsOnly = """

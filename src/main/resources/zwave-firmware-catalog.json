@@ -1,0 +1,351 @@
+{
+  "catalogVersion": "2026-07-21",
+  "entries": [
+    {
+      "model": "ZEN04",
+      "vendor": "Zooz",
+      "description": "smart plug (metering)",
+      "match": { "deviceModels": ["ZEN04"] },
+      "lines": [
+        {
+          "line": "800LR",
+          "installedMajor": [2],
+          "latest": "2.60",
+          "url": "https://www.getzooz.com/firmware/ZEN04_V02R60.gbl",
+          "note": "2.40 kills redundant reports, 2.50 SDK 7.19->7.24 (S2/SPAN fix)"
+        },
+        {
+          "line": "700",
+          "installedMajor": [1],
+          "latest": "1.30",
+          "url": "https://www.getzooz.com/firmware/ZEN04_V01R30.gbl"
+        }
+      ]
+    },
+    {
+      "model": "ZEN14",
+      "vendor": "Zooz",
+      "description": "outdoor double plug",
+      "match": { "deviceModels": ["ZEN14"] },
+      "lines": [
+        {
+          "line": "800LR",
+          "installedMajor": [2],
+          "latest": "2.30",
+          "url": "https://www.getzooz.com/firmware/ZEN14_V02R30.gbl"
+        },
+        {
+          "line": "700",
+          "installedMajor": [1],
+          "latest": "1.20",
+          "url": "https://www.getzooz.com/firmware/ZEN14_V01R20.gbl"
+        }
+      ]
+    },
+    {
+      "model": "ZEN20",
+      "vendor": "Zooz",
+      "description": "power strip",
+      "match": { "deviceModels": ["ZEN20"], "driverTypes": ["Zooz Power Strip"] },
+      "lines": [
+        {
+          "line": "800LR",
+          "installedMajor": [4],
+          "latest": "4.30",
+          "url": "https://www.getzooz.com/firmware/ZEN20_V04R30.gbl"
+        },
+        {
+          "line": "500",
+          "installedMajor": [2],
+          "latest": "2.02",
+          "url": "https://www.getzooz.com/firmware/ZEN20-V2.01-to-V2.02.otz",
+          "note": "500-series .otz image"
+        }
+      ]
+    },
+    {
+      "model": "ZEN51",
+      "vendor": "Zooz",
+      "description": "dry contact relay",
+      "match": { "deviceModels": ["ZEN51"] },
+      "lines": [
+        {
+          "line": "800LR",
+          "installedMajor": [1],
+          "latest": "1.90",
+          "url": "https://www.getzooz.com/firmware/ZEN51_V01R90.gbl"
+        }
+      ]
+    },
+    {
+      "model": "ZEN52",
+      "vendor": "Zooz",
+      "description": "double relay",
+      "match": { "deviceModels": ["ZEN52"] },
+      "lines": [
+        {
+          "line": "800LR",
+          "installedMajor": [1],
+          "latest": "1.90",
+          "url": "https://www.getzooz.com/firmware/ZEN52_V01R90_US.gbl"
+        }
+      ]
+    },
+    {
+      "model": "ZEN55",
+      "vendor": "Zooz",
+      "description": "smoke/CO detector bridge (DC signal sensor)",
+      "match": { "deviceModels": ["ZEN55"] },
+      "lines": [
+        {
+          "line": "800LR",
+          "installedMajor": [1],
+          "latest": "1.50",
+          "url": "https://www.getzooz.com/firmware/ZEN55_V01R50.gbl"
+        }
+      ]
+    },
+    {
+      "model": "ZEN71",
+      "vendor": "Zooz",
+      "description": "on/off switch",
+      "match": { "deviceModels": ["ZEN71"] },
+      "lines": [
+        {
+          "line": "800LR",
+          "installedMajor": [3],
+          "latest": "3.70",
+          "url": "https://www.getzooz.com/firmware/ZEN71_V03R70.gbl"
+        },
+        {
+          "line": "800LR-v4",
+          "installedMajor": [4],
+          "latest": "4.20",
+          "url": "https://www.getzooz.com/firmware/ZEN71_V04R20.gbl"
+        },
+        {
+          "line": "700",
+          "installedMajor": [2],
+          "latest": "2.30",
+          "url": "https://www.getzooz.com/firmware/ZEN71_V02R30.gbl"
+        }
+      ]
+    },
+    {
+      "model": "ZEN72",
+      "vendor": "Zooz",
+      "description": "dimmer",
+      "match": { "deviceModels": ["ZEN72"] },
+      "lines": [
+        {
+          "line": "800LR",
+          "installedMajor": [3],
+          "latest": "3.70",
+          "url": "https://www.getzooz.com/firmware/ZEN72_V03R70.gbl"
+        },
+        {
+          "line": "800LR-v4",
+          "installedMajor": [4],
+          "latest": "4.20",
+          "url": "https://www.getzooz.com/firmware/ZEN72_V04R20.gbl"
+        },
+        {
+          "line": "700",
+          "installedMajor": [2],
+          "latest": "2.20",
+          "url": "https://www.getzooz.com/firmware/ZEN72_V02R20.gbl"
+        }
+      ]
+    },
+    {
+      "model": "ZEN76",
+      "vendor": "Zooz",
+      "description": "S2 on/off switch",
+      "match": { "deviceModels": ["ZEN76"] },
+      "lines": [
+        {
+          "line": "800LR",
+          "installedMajor": [3],
+          "latest": "3.60",
+          "url": "https://www.getzooz.com/firmware/ZEN76_V03R60.gbl"
+        },
+        {
+          "line": "800LR-v4",
+          "installedMajor": [4],
+          "latest": "4.10",
+          "url": "https://www.getzooz.com/firmware/ZEN76_V04R10.gbl"
+        },
+        {
+          "line": "700",
+          "installedMajor": [2, 10],
+          "latest": "2.30",
+          "url": "https://www.getzooz.com/firmware/ZEN76_V02R30.gbl"
+        }
+      ]
+    },
+    {
+      "model": "ZSE29",
+      "vendor": "Zooz",
+      "description": "outdoor motion sensor (discontinued, superseded by ZSE70)",
+      "match": { "deviceModels": ["ZSE29"], "driverTypes": ["Zooz Outdoor Motion Sensor"] },
+      "battery": true,
+      "note": "HW VER 1.0 cannot take 2.x firmware; a 1.x install intentionally matches no line",
+      "lines": [
+        {
+          "line": "HW2.0",
+          "installedMajor": [2],
+          "latest": "2.20",
+          "url": "https://www.getzooz.com/firmware/ZSE29_V02R20.otz"
+        }
+      ]
+    },
+    {
+      "model": "ZSE42",
+      "vendor": "Zooz",
+      "description": "water leak XS sensor",
+      "match": { "deviceModels": ["ZSE42"] },
+      "battery": true,
+      "lines": [
+        {
+          "line": "800LR",
+          "installedMajor": [2],
+          "latest": "2.40",
+          "url": "https://www.getzooz.com/firmware/ZSE42_V02R40_US.gbl"
+        }
+      ]
+    },
+    {
+      "model": "ZSE43",
+      "vendor": "Zooz",
+      "description": "tilt/shock XS sensor",
+      "match": { "deviceModels": ["ZSE43"] },
+      "battery": true,
+      "note": "catalog only knows the 1.x line; a 2.x install lands in check-manually until the 800LR line is cataloged",
+      "lines": [
+        {
+          "line": "700",
+          "installedMajor": [1],
+          "latest": "1.20",
+          "url": "https://www.getzooz.com/firmware/ZSE43_V01R20.gbl"
+        }
+      ]
+    },
+    {
+      "model": "ZAC38",
+      "vendor": "Zooz",
+      "description": "range extender",
+      "match": { "deviceModels": ["ZAC38"], "driverTypes": ["Zooz ZAC38 Range Extender"] },
+      "lines": [
+        {
+          "line": "800LR",
+          "installedMajor": [1],
+          "latest": "1.30",
+          "url": "https://www.getzooz.com/firmware/ZAC38_V01R30.gbl"
+        }
+      ]
+    },
+    {
+      "model": "ZAC36",
+      "vendor": "Zooz",
+      "description": "Titan water valve actuator",
+      "match": { "deviceModels": ["ZAC36"], "driverTypes": ["Zooz ZAC36 Ball Valve Controller"] },
+      "lines": [
+        {
+          "line": "700",
+          "installedMajor": [1],
+          "latest": "1.24",
+          "url": "https://www.getzooz.com/firmware/ZAC36_V01R24.gbl",
+          "note": "1.24 fixes auto-close when backup battery charging"
+        },
+        {
+          "line": "800LR",
+          "installedMajor": [2],
+          "latest": "2.10",
+          "url": "https://www.getzooz.com/firmware/ZAC36LR_V02R10.gbl"
+        }
+      ]
+    },
+    {
+      "model": "DZPD3",
+      "vendor": "Leviton",
+      "description": "Decora Smart Plug-in Dimmer",
+      "match": {
+        "deviceModels": ["DZPD3"],
+        "ids": [{ "manufacturer": 29, "deviceType": 13569, "deviceId": 820 }]
+      },
+      "lines": [
+        {
+          "line": "mains",
+          "installedMajor": [1],
+          "latest": "1.22",
+          "url": "https://leviton.com/content/dam/leviton/support/DZPD3_v1_22.ota",
+          "note": "do NOT cross Leviton model files (brick risk)"
+        }
+      ]
+    },
+    {
+      "model": "DZPA1",
+      "vendor": "Leviton",
+      "description": "Decora Smart Plug-in Appliance/Switch",
+      "match": { "deviceModels": ["DZPA1"] },
+      "lines": [
+        {
+          "line": "mains",
+          "installedMajor": [1],
+          "latest": "1.23",
+          "url": "https://leviton.com/content/dam/leviton/support/DZPA1_v1_23.ota",
+          "note": "do NOT cross Leviton model files (brick risk)"
+        }
+      ]
+    },
+    {
+      "model": "DZ15S",
+      "vendor": "Leviton",
+      "description": "Decora Smart 15A Switch",
+      "match": { "deviceModels": ["DZ15S"] },
+      "lines": [
+        {
+          "line": "mains",
+          "installedMajor": [1],
+          "latest": "1.23",
+          "url": "https://leviton.com/content/dam/leviton/support/DZ15S_v1_23.ota",
+          "note": "do NOT cross Leviton model files (brick risk)"
+        }
+      ]
+    },
+    {
+      "model": "U-BOLT-PRO-ZWAVE",
+      "vendor": "Ultraloq",
+      "description": "U-Bolt Pro Z-Wave lock",
+      "match": {
+        "ids": [{ "manufacturer": 1106, "deviceType": 4, "deviceId": 1 }]
+      },
+      "battery": true,
+      "flirs": true,
+      "recommendation": "warn",
+      "warning": "Locks on 1.01 / early-2022 HW often FAIL the 1.5 update (Invalid Firmware Target); U-Tec's fix was hardware replacement. 1.5 changelog is 'Fixed door state issue' only, community reports 1.5 WORSENS lock-state reporting, and there is NO downgrade off 1.5. Not recommended.",
+      "lines": [
+        {
+          "line": "all",
+          "installedMajor": [1],
+          "latest": "1.5",
+          "url": "https://file.u-tec.com/homekit/U-BOLT-PRO-ZWAVE_V1.5.gbl",
+          "note": "sha256 fc0b831cf69dfbf4af7b6c95ee92b349899390b36daedb3413bfa17117eb4bab"
+        }
+      ]
+    },
+    {
+      "model": "RSZ1",
+      "vendor": "Springs Window Fashions",
+      "description": "roller shade motor (Somfy-made; also Bali/Graber)",
+      "match": {
+        "driverTypes": ["Springs Window Fashions Roller Shade"],
+        "ids": [{ "manufacturer": 622, "deviceType": 21075, "deviceId": 23089 }]
+      },
+      "battery": true,
+      "recommendation": "skip",
+      "note": "No usable vendor firmware: latest known is ~14.7 but community says 13.3 is more reliable, Springs refuses updates for old motors, and the only downloadable file (11.3) is older than installed.",
+      "lines": []
+    }
+  ]
+}

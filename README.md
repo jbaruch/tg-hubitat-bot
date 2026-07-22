@@ -14,9 +14,7 @@
   * `/off [device name]` - Turns off a specified device.
   * `/open [device name]` - Opens a specified device (e.g., shades).
   * `/close [device name]` - Closes a specified device.
-  * `/set_color [device name] [color]` - Sets the color of a compatible device.
-  * `/set_color_temperature [device name] [temperature]` - Sets the color temperature of a compatible device.
-  * `/set_level [device name] [level]` - Sets the level of a dimmable device.
+  * `/set_level [device name] [level]` - Sets the level (0-100) of a dimmable device (dimmers and bulbs).
   * `/double_tap [device name]` - Executes a double tap action on a button device.
   * `/push [device name]` - Executes a push action on a button device.
   * `/hold [device name]` - Executes a hold action on a button device.

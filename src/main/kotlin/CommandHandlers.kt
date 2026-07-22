@@ -45,13 +45,10 @@ object CommandHandlers {
             val args = tokens.drop(i)
             deviceManager.findDevice(name, camelCaseCommand).fold(
                 onSuccess = { device ->
-                    val argCount = device.supportedOps[camelCaseCommand]
-                    if (argCount == null) {
-                        if (unsupportedError == null) {
-                            unsupportedError =
-                                "Command '/$snakeCaseCommand' is not supported by device '${device.label}'"
-                        }
-                    } else if (args.size == argCount) {
+                    // findDevice only succeeds when the device supports the
+                    // command, so the op is guaranteed present here.
+                    val argCount = device.supportedOps.getValue(camelCaseCommand)
+                    if (args.size == argCount) {
                         return runDeviceCommand(
                             device, camelCaseCommand, args,
                             networkClient, makerApiAppId, makerApiToken, defaultHubIp
@@ -62,9 +59,10 @@ object CommandHandlers {
                     }
                 },
                 onFailure = {
-                    val message = it.message ?: ""
-                    if (message.contains("not supported") && unsupportedError == null) {
-                        unsupportedError = message
+                    // findDevice signals "device exists but can't do this" with
+                    // IllegalArgumentException; anything else is "not found".
+                    if (it is IllegalArgumentException && unsupportedError == null) {
+                        unsupportedError = it.message
                     }
                 }
             )

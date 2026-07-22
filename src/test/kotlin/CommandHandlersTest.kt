@@ -97,9 +97,14 @@ class CommandHandlersTest : FunSpec({
             val message = mock<Message> {
                 on { text } doReturn "/invalid_command kitchen_light"
             }
-            val device = Device.VirtualSwitch(1, "Kitchen Light")
+            // findDevice signals an unsupported command with
+            // IllegalArgumentException, matching the real DeviceManager.
             whenever(deviceManager.findDevice(eq("kitchen_light"), eq("invalidCommand")))
-                .thenReturn(Result.success(device))
+                .thenReturn(
+                    Result.failure(
+                        IllegalArgumentException("Command 'invalidCommand' is not supported by device 'Kitchen Light'")
+                    )
+                )
 
             val result = CommandHandlers.handleDeviceCommand(
                 bot, message, deviceManager, networkClient,

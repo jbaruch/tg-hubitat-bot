@@ -2,8 +2,8 @@ name: Firmware catalog refresh
 
 on:
   schedule:
-    # Weekly, Monday 06:00 UTC
-    - cron: '0 6 * * 1'
+    # Twice a month, 06:00 UTC on the 1st and 15th
+    - cron: '0 6 1,15 * *'
   workflow_dispatch:
 
 jobs:
@@ -23,6 +23,7 @@ jobs:
         run: python3 .github/scripts/refresh_zooz_catalog.py
 
       - name: Open PR with catalog changes
+        id: pr
         if: steps.refresh.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v7
         with:
@@ -33,3 +34,29 @@ jobs:
           add-paths: src/main/resources/zwave-firmware-catalog.json
           labels: enhancement
           delete-branch: true
+
+      # The bot reads the catalog from main at /firmware time, so merging the
+      # PR is all it takes for the new versions to reach the device report.
+      - name: Notify Telegram
+        if: steps.refresh.outputs.news == 'true'
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          PR_URL: ${{ steps.pr.outputs.pull-request-url }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BOT_TOKEN}" ] || [ -z "${CHAT_ID}" ]; then
+            echo "BOT_TOKEN / CHAT_ID repository secrets are not set - cannot notify" >&2
+            exit 1
+          fi
+          text="$(cat catalog-refresh-summary.md)"
+          if [ -n "${PR_URL}" ]; then
+            text="${text}
+
+Catalog PR: ${PR_URL}
+Merge it, then /firmware shows which devices it applies to."
+          fi
+          curl -sf -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${CHAT_ID}" \
+            --data-urlencode "text=${text}" > /dev/null
+          echo "Telegram notification sent"

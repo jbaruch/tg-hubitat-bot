@@ -1,5 +1,19 @@
 # Changes Log
 
+## Refresh Consistency and Thread-Safe Device State
+
+### Overview
+/refresh now fully refreshes what the bot knows, and concurrent commands can never observe half-refreshed state.
+
+### Changes Made
+- The set of recognized device commands is recomputed on every /refresh, so a command class introduced by newly exposed devices (e.g. the first actuator after a sensors-only boot) starts working without a restart
+- Device list, name cache, and command set are published as one atomic snapshot; a /refresh racing another command can no longer expose a mixed or half-built state
+- Duplicate-label warnings from the name cache now appear in the /refresh reply instead of only the console
+
+### Benefits
+- /refresh behaves like a real refresh - no restart needed for new device classes
+- No racy surprises when commands and refreshes overlap
+
 ## Handler Failure Replies, HTTP Status Checking, and /list Escaping
 
 ### Overview

@@ -30,7 +30,9 @@ import io.ktor.client.statement.bodyAsText
 
 private val logger = org.slf4j.LoggerFactory.getLogger("jbaru.ch.telegram.hubitat.Main")
 private lateinit var config: BotConfiguration
-private lateinit var hubs: List<Device.Hub>
+// Reassigned by /refresh while /update may be reading it from another
+// dispatcher thread; volatile so readers see a complete list, old or new.
+@Volatile private var hubs: List<Device.Hub> = emptyList()
 private val client = HttpClient(CIO) {
     // Never let a hung or rebooting hub block a command handler forever.
     install(HttpTimeout) {

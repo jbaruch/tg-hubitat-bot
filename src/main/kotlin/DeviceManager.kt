@@ -9,16 +9,27 @@ import kotlinx.serialization.json.jsonPrimitive
 
 class DeviceManager(deviceListJson: String) {
 
-    private val deviceCache: MutableMap<String, Device> = mutableMapOf()
-    private lateinit var devices: List<Device>
-    private val allDeviceCommands: Set<String>
+    // One snapshot behind a single volatile reference: telegram-bot dispatch
+    // is multi-threaded, so a /refresh racing a concurrently handled command
+    // must never expose a half-built cache or a mixed epoch (new device list
+    // with the old cache). Readers grab the reference once and see one
+    // consistent state. The guarantee is the atomic swap - nothing mutates a
+    // Snapshot's collections after publication, but the contained Device
+    // objects themselves (Hub's var ip/managementToken) are not deeply
+    // immutable.
+    private class Snapshot(
+        val devices: List<Device>,
+        val deviceCache: Map<String, Device>,
+        val allDeviceCommands: Set<String>
+    )
 
+    @Volatile private var snapshot: Snapshot = Snapshot(emptyList(), emptyMap(), emptySet())
 
     init {
         refreshDevices(deviceListJson)
-        allDeviceCommands = devices.flatMap { it.supportedOps.keys }.toSet()
     }
 
+    @Synchronized
     fun refreshDevices(deviceListJson: String): Pair<Int, List<String>> {
         val format = Json { ignoreUnknownKeys = true }
         val warnings: MutableList<String> = ArrayList()
@@ -27,7 +38,7 @@ class DeviceManager(deviceListJson: String) {
         // newly-installed driver with no @Serializable subclass yet) is skipped
         // with a visible warning instead of aborting the whole list and crashing
         // the bot at boot.
-        devices = format.parseToJsonElement(deviceListJson).jsonArray.mapNotNull { element ->
+        val newDevices = format.parseToJsonElement(deviceListJson).jsonArray.mapNotNull { element ->
             try {
                 format.decodeFromJsonElement<Device>(element)
             } catch (e: Exception) {
@@ -41,18 +52,27 @@ class DeviceManager(deviceListJson: String) {
             }
         }
 
-        deviceCache.clear()
-        warnings.addAll(initializeCache(devices))
-        return Pair(devices.size, warnings)
+        val newCache = mutableMapOf<String, Device>()
+        warnings.addAll(initializeCache(newDevices, newCache))
+
+        // The command set is recomputed on every refresh, not just at boot: a
+        // command a device introduces via /refresh must start matching in
+        // DeviceCommandFilter.
+        snapshot = Snapshot(
+            devices = newDevices,
+            deviceCache = newCache,
+            allDeviceCommands = newDevices.flatMap { it.supportedOps.keys }.toSet()
+        )
+        return Pair(newDevices.size, warnings)
     }
 
     fun isDeviceCommand(command: String): Boolean {
-        return command in allDeviceCommands
+        return command in snapshot.allDeviceCommands
     }
 
     fun findDevice(name: String, command: String): Result<Device> {
         val normalizedQuery = name.lowercase()
-        val device = deviceCache[normalizedQuery]
+        val device = snapshot.deviceCache[normalizedQuery]
 
         if (device != null) {
             return if (device.supportedOps.containsKey(command)) {
@@ -66,16 +86,18 @@ class DeviceManager(deviceListJson: String) {
     }
 
     fun <T : Device> findDevicesByType(type: Class<T>): List<T> {
-        return devices.filterIsInstance(type)
+        return snapshot.devices.filterIsInstance(type)
     }
 
     fun list(): String {
+        // Grab the reference once: the snapshot may be swapped mid-render.
+        val cache = snapshot.deviceCache
         val deviceToAliases = mutableMapOf<Device, MutableList<String>>()
         var maxDeviceNameLength = 0
         var maxAliasesLength = 0
 
         // Group aliases by device and find maximum lengths
-        deviceCache.forEach { (alias, device) ->
+        cache.forEach { (alias, device) ->
             deviceToAliases.getOrPut(device) { mutableListOf() }.add(escapeMarkdownCode(alias))
             maxDeviceNameLength = maxOf(maxDeviceNameLength, escapeMarkdownCode(device.label).length)
             maxAliasesLength = maxOf(maxAliasesLength, deviceToAliases[device]!!.joinToString(", ").length)
@@ -110,8 +132,10 @@ class DeviceManager(deviceListJson: String) {
     }
 
     fun listByType(): Map<String, String> {
+        // Grab the reference once: the snapshot may be swapped mid-render.
+        val cache = snapshot.deviceCache
         // Group devices by their base type
-        val devicesByType = deviceCache.values.groupBy { device ->
+        val devicesByType = cache.values.groupBy { device ->
             when (device) {
                 is Device.Actuator -> "Actuators"
                 is Device.Button -> "Buttons"
@@ -127,7 +151,7 @@ class DeviceManager(deviceListJson: String) {
             var maxAliasesLength = 0
 
             // Group aliases by device and find maximum lengths for this type
-            deviceCache.forEach { (alias, device) ->
+            cache.forEach { (alias, device) ->
                 if (devices.contains(device)) {
                     deviceToAliases.getOrPut(device) { mutableListOf() }.add(escapeMarkdownCode(alias))
                     maxDeviceNameLength = maxOf(maxDeviceNameLength, escapeMarkdownCode(device.label).length)
@@ -158,19 +182,19 @@ class DeviceManager(deviceListJson: String) {
 
 
     val deviceCount: Int
-        get() = devices.size
+        get() = snapshot.devices.size
 
-    private fun initializeCache(devices: List<Device>): List<String> {
+    private fun initializeCache(devices: List<Device>, cache: MutableMap<String, Device>): List<String> {
         val warnings: MutableList<String> = ArrayList()
         val nameMatrix = DeviceAbbreviator()
         for (device in devices) {
             val fullName = device.label.lowercase()
-            addToCache(fullName, device)
+            warnings.addAll(addToCache(cache, fullName, device))
 
             // Add name without "Light" or "Lights" if applicable
             val nameWithoutLights = removeLightSuffix(fullName)
             if (nameWithoutLights != fullName) {
-                addToCache(nameWithoutLights, device)
+                warnings.addAll(addToCache(cache, nameWithoutLights, device))
             }
 
             nameMatrix.addName(fullName)
@@ -180,7 +204,7 @@ class DeviceManager(deviceListJson: String) {
             val fullName = device.label.lowercase()
             val abbreviation = nameMatrix.getAbbreviation(fullName)
             if (abbreviation.isSuccess) {
-                warnings.addAll(addToCache(abbreviation.getOrThrow(), device))
+                warnings.addAll(addToCache(cache, abbreviation.getOrThrow(), device))
             } else {
                 val message = "WARNING Device name was not abbreviated: $fullName"
                 warnings.add(message)
@@ -190,14 +214,14 @@ class DeviceManager(deviceListJson: String) {
         return warnings
     }
 
-    private fun addToCache(key: String, device: Device): List<String> {
+    private fun addToCache(cache: MutableMap<String, Device>, key: String, device: Device): List<String> {
         val warnings: MutableList<String> = ArrayList()
-        if (deviceCache.containsKey(key)) {
+        if (cache.containsKey(key)) {
             val message = "WARNING Duplicate key found in cache: $key"
             warnings.add(message)
             println(message)
         }
-        deviceCache[key] = device
+        cache[key] = device
         return warnings
     }
 

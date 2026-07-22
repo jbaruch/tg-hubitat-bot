@@ -81,6 +81,43 @@ class CommandFlowIntegrationTest : FunSpec({
         result shouldBe "Done: Living Room Light → on"
     }
     
+    test("device command flow - full multi-word device name") {
+        val mockEngine = MockEngine { request ->
+            when {
+                request.url.encodedPath.contains("/devices/1/on") -> {
+                    respond(content = ByteReadChannel(""), status = HttpStatusCode.OK)
+                }
+                else -> {
+                    respond(content = ByteReadChannel("Not found"), status = HttpStatusCode.NotFound)
+                }
+            }
+        }
+
+        val client = HttpClient(mockEngine)
+        val networkClient = KtorNetworkClient(client)
+        val deviceManager = DeviceManager(devicesJson)
+
+        val bot = mock<com.github.kotlintelegrambot.Bot>()
+        val message = Message(
+            messageId = 1,
+            date = 0,
+            chat = Chat(id = 123, type = "private"),
+            text = "/on Living Room Light" // Full name as documented in the README
+        )
+
+        val result = CommandHandlers.handleDeviceCommand(
+            bot = bot,
+            message = message,
+            deviceManager = deviceManager,
+            networkClient = networkClient,
+            makerApiAppId = "test-app",
+            makerApiToken = "test-token",
+            defaultHubIp = "192.168.1.100"
+        )
+
+        result shouldBe "Done: Living Room Light → on"
+    }
+
     test("device command flow - device not found") {
         val mockEngine = MockEngine { request ->
             respond(

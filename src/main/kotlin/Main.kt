@@ -41,6 +41,8 @@ private val client = HttpClient(CIO) {
 }
 private lateinit var networkClient: NetworkClient
 private lateinit var deviceManager: DeviceManager
+// Resolved via getMe() at startup; used to validate /cmd@BotName mentions.
+@Volatile private var botUsername: String? = null
 
 fun main() {
     config = BotConfiguration.fromEnvironment()
@@ -62,7 +64,7 @@ fun main() {
 
         dispatch {
 
-            message(DeviceCommandFilter { deviceManager }) {
+            message(DeviceCommandFilter({ deviceManager })) {
                 if (!isAuthorized(message)) return@message
                 replyTo(bot, message) {
                     CommandHandlers.handleDeviceCommand(
@@ -199,6 +201,11 @@ fun main() {
         }
     }
 
+    botUsername = bot.getMe().getOrNull()?.username
+    if (botUsername == null) {
+        logger.warn("Could not resolve the bot's username via getMe(); mention-form commands (/cmd@BotName) will be ignored")
+    }
+
     if (config.allowedChatIds.isEmpty()) {
         logger.warn(
             "No ALLOWED_CHAT_IDS or CHAT_ID configured - the bot will accept commands from ANY chat. " +
@@ -245,21 +252,33 @@ private fun replyTo(bot: Bot, message: Message, block: suspend () -> String) {
 private fun isAuthorized(message: Message): Boolean {
     val allowed = config.isChatAllowed(message.chat.id)
     if (!allowed) {
+        // Log only the command token: full text from a stranger is both a
+        // privacy leak and a log-spam vector.
         logger.warn(
             "Dropping command from unauthorized chat {} (user {}): {}",
-            message.chat.id, message.from?.id, message.text
+            message.chat.id, message.from?.id, message.text?.split(" ")?.firstOrNull()?.take(64)
         )
     }
     return allowed
 }
 
-class DeviceCommandFilter(private val deviceManagerProvider: () -> DeviceManager) : Filter {
+class DeviceCommandFilter(
+    private val deviceManagerProvider: () -> DeviceManager,
+    private val botUsernameProvider: () -> String? = { botUsername }
+) : Filter {
     override fun Message.predicate(): Boolean {
         // Only explicit commands qualify: a leading slash is required so plain
         // chat text ("on kitchen") is never interpreted as a device command.
         val firstToken = text?.split(" ")?.firstOrNull() ?: return false
         if (!firstToken.startsWith("/")) return false
-        // In group chats commands arrive as /on@BotName - strip the mention.
+        // In group chats commands arrive as /on@BotName. A mention addressed
+        // to a DIFFERENT bot (privacy mode off delivers those too) must not
+        // drive this one; if our own username is unknown, reject mention forms
+        // rather than guess.
+        val mention = firstToken.substringAfter("@", "")
+        if (mention.isNotEmpty() && !mention.equals(botUsernameProvider(), ignoreCase = true)) {
+            return false
+        }
         val command = firstToken.removePrefix("/").substringBefore("@")
         return command.isNotEmpty() && deviceManagerProvider().isDeviceCommand(command.snakeToCamelCase())
     }

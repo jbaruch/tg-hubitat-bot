@@ -23,7 +23,9 @@ object CommandHandlers {
         makerApiToken: String,
         defaultHubIp: String
     ): String {
-        val parts = message.text?.split(" ") ?: return "Please specify a device name for the command."
+        // Trim + split on runs of whitespace: "/on " or doubled spaces must not
+        // produce empty tokens that the multi-token name search would probe.
+        val parts = message.text?.trim()?.split(Regex("\\s+")) ?: emptyList()
         if (parts.size < 2) {
             return "Please specify a device name for the command."
         }
@@ -31,25 +33,48 @@ object CommandHandlers {
         // Strip the group-chat mention form (/on@BotName) to the bare command.
         val snakeCaseCommand = parts[0].removePrefix("/").substringBefore("@")
         val camelCaseCommand = snakeCaseCommand.snakeToCamelCase()
-        val deviceName = parts[1]
-        val args = parts.drop(2)
+        val tokens = parts.drop(1)
+        val fullQuery = tokens.joinToString(" ")
 
-        return deviceManager.findDevice(deviceName, camelCaseCommand).fold(
-            onSuccess = { device ->
-                val argCount = device.supportedOps[camelCaseCommand]
-                if (argCount == null) {
-                    "Command '/$snakeCaseCommand' is not supported by device '${device.label}'"
-                } else if (args.size != argCount) {
-                    "Invalid number of arguments for /$snakeCaseCommand. Expected $argCount argument(s)."
-                } else {
-                    runDeviceCommand(device, camelCaseCommand, args, networkClient, makerApiAppId, makerApiToken, defaultHubIp)
+        // Device labels are multi-word ("Kitchen Lights", "Front Door Button"),
+        // so the device/args boundary is not fixed. Try the longest possible
+        // name first and shrink until a known device with the right trailing
+        // argument count matches; the longest match wins so a device whose name
+        // prefixes another's never steals the query.
+        var mismatchError: String? = null
+        var unsupportedError: String? = null
+
+        for (i in tokens.size downTo 1) {
+            val name = tokens.take(i).joinToString(" ")
+            val args = tokens.drop(i)
+            deviceManager.findDevice(name, camelCaseCommand).fold(
+                onSuccess = { device ->
+                    // findDevice only succeeds when the device supports the
+                    // command, so the op is guaranteed present here.
+                    val argCount = device.supportedOps.getValue(camelCaseCommand)
+                    if (args.size == argCount) {
+                        return runDeviceCommand(
+                            device, camelCaseCommand, args,
+                            networkClient, makerApiAppId, makerApiToken, defaultHubIp
+                        )
+                    } else if (mismatchError == null) {
+                        mismatchError =
+                            "Invalid number of arguments for /$snakeCaseCommand. Expected $argCount argument(s)."
+                    }
+                },
+                onFailure = {
+                    // findDevice signals "device exists but can't do this" with
+                    // IllegalArgumentException; anything else is "not found".
+                    if (it is IllegalArgumentException && unsupportedError == null) {
+                        unsupportedError = it.message
+                    }
                 }
-            },
-            onFailure = {
-                logger.warn("Device command '{}' failed: {}", snakeCaseCommand, it.message)
-                it.message.toString()
-            }
-        )
+            )
+        }
+
+        val error = mismatchError ?: unsupportedError ?: "No device found for query: $fullQuery"
+        logger.warn("Device command '{}' failed: {}", snakeCaseCommand, error)
+        return error
     }
     
     suspend fun handleListCommand(deviceManager: DeviceManager): Map<String, String> {

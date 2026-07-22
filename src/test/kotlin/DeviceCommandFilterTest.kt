@@ -19,7 +19,7 @@ class DeviceCommandFilterTest : FunSpec({
             on { isDeviceCommand("cancelAlerts") } doReturn false
             on { isDeviceCommand("unknown") } doReturn false
         }
-        filter = DeviceCommandFilter { deviceManager }
+        filter = DeviceCommandFilter({ deviceManager }, { "MyHomeBot" })
     }
 
     fun messageWithText(value: String?): Message = mock {
@@ -68,5 +68,21 @@ class DeviceCommandFilterTest : FunSpec({
 
     test("does not match a mention of an unknown command") {
         matches("/unknown@MyHomeBot kitchen") shouldBe false
+    }
+
+    test("does not match a mention addressed to a different bot") {
+        matches("/on@OtherBot kitchen") shouldBe false
+    }
+
+    test("matches the mention case-insensitively") {
+        matches("/on@myhomebot kitchen") shouldBe true
+    }
+
+    test("rejects mention forms when own username is unknown") {
+        val anonymous = DeviceCommandFilter({ deviceManager }, { null })
+        with(anonymous) {
+            messageWithText("/on@MyHomeBot kitchen").predicate() shouldBe false
+            messageWithText("/on kitchen").predicate() shouldBe true
+        }
     }
 })

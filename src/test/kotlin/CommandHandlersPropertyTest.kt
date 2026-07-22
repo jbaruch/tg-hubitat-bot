@@ -28,16 +28,13 @@ class CommandHandlersPropertyTest : FunSpec({
                 
                 if (command.isNotEmpty() && deviceName.isNotEmpty()) {
                     val camelCommand = command.snakeToCamelCase()
-                    val device = Device.VirtualSwitch(1, "Test Device")
-                    
-                    whenever(deviceManager.findDevice(eq(deviceName), eq(camelCommand)))
-                        .thenReturn(Result.success(device))
-                    
-                    val mockResponse = mock<HttpResponse> {
-                        on { status } doReturn HttpStatusCode.OK
-                    }
-                    whenever(networkClient.get(any(), any())).thenReturn(mockResponse)
-                    
+
+                    // findDevice's contract is success-implies-supported, so an
+                    // arbitrary generated command must stub the failure path;
+                    // the property under test is the parsing, verified below.
+                    whenever(deviceManager.findDevice(any(), any()))
+                        .thenReturn(Result.failure(Exception("No device found for query: $deviceName")))
+
                     val messageText = "/$command $deviceName"
                     val message = mock<Message> {
                         on { text } doReturn messageText

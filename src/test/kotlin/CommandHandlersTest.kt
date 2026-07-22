@@ -65,6 +65,8 @@ class CommandHandlersTest : FunSpec({
                 on { text } doReturn "/push button 1 extra_arg"
             }
             val device = Device.VirtualButton(1, "Button")
+            whenever(deviceManager.findDevice(any(), any()))
+                .thenReturn(Result.failure(Exception("No device found for query: probe")))
             whenever(deviceManager.findDevice(eq("button"), eq("push")))
                 .thenReturn(Result.success(device))
             
@@ -95,9 +97,14 @@ class CommandHandlersTest : FunSpec({
             val message = mock<Message> {
                 on { text } doReturn "/invalid_command kitchen_light"
             }
-            val device = Device.VirtualSwitch(1, "Kitchen Light")
+            // findDevice signals an unsupported command with
+            // IllegalArgumentException, matching the real DeviceManager.
             whenever(deviceManager.findDevice(eq("kitchen_light"), eq("invalidCommand")))
-                .thenReturn(Result.success(device))
+                .thenReturn(
+                    Result.failure(
+                        IllegalArgumentException("Command 'invalidCommand' is not supported by device 'Kitchen Light'")
+                    )
+                )
 
             val result = CommandHandlers.handleDeviceCommand(
                 bot, message, deviceManager, networkClient,
@@ -126,6 +133,8 @@ class CommandHandlersTest : FunSpec({
                 on { text } doReturn "/push button 1"
             }
             val device = Device.VirtualButton(1, "Button")
+            whenever(deviceManager.findDevice(any(), any()))
+                .thenReturn(Result.failure(Exception("No device found for query: probe")))
             whenever(deviceManager.findDevice(eq("button"), eq("push")))
                 .thenReturn(Result.success(device))
 
@@ -166,6 +175,133 @@ class CommandHandlersTest : FunSpec({
         }
     }
     
+    context("handleDeviceCommand with multi-word device names") {
+        test("resolves a full multi-word name with no args") {
+            val message = mock<Message> {
+                on { text } doReturn "/on kitchen lights"
+            }
+            val device = Device.VirtualSwitch(1, "Kitchen Lights")
+            whenever(deviceManager.findDevice(any(), any()))
+                .thenReturn(Result.failure(Exception("No device found for query: probe")))
+            whenever(deviceManager.findDevice(eq("kitchen lights"), eq("on")))
+                .thenReturn(Result.success(device))
+
+            val mockResponse = mock<HttpResponse> {
+                on { status } doReturn HttpStatusCode.OK
+            }
+            whenever(networkClient.get(any(), any())).thenReturn(mockResponse)
+
+            val result = CommandHandlers.handleDeviceCommand(
+                bot, message, deviceManager, networkClient,
+                makerApiAppId, makerApiToken, defaultHubIp
+            )
+
+            result shouldBe "Done: Kitchen Lights → on"
+        }
+
+        test("resolves a multi-word name followed by trailing args") {
+            val message = mock<Message> {
+                on { text } doReturn "/push front door button 1"
+            }
+            val device = Device.VirtualButton(7, "Front Door Button")
+            whenever(deviceManager.findDevice(any(), any()))
+                .thenReturn(Result.failure(Exception("No device found for query: probe")))
+            whenever(deviceManager.findDevice(eq("front door button"), eq("push")))
+                .thenReturn(Result.success(device))
+
+            val mockResponse = mock<HttpResponse> {
+                on { status } doReturn HttpStatusCode.OK
+            }
+            whenever(networkClient.get(argThat { contains("/devices/7/push/1") }, any()))
+                .thenReturn(mockResponse)
+
+            val result = CommandHandlers.handleDeviceCommand(
+                bot, message, deviceManager, networkClient,
+                makerApiAppId, makerApiToken, defaultHubIp
+            )
+
+            result shouldBe "Done: Front Door Button → push 1"
+        }
+
+        test("prefers the longest matching name over a shorter prefix") {
+            val message = mock<Message> {
+                on { text } doReturn "/push master bedroom button 2"
+            }
+            val longer = Device.VirtualButton(2, "Master Bedroom Button")
+            val shorter = Device.VirtualButton(3, "Master")
+            whenever(deviceManager.findDevice(any(), any()))
+                .thenReturn(Result.failure(Exception("No device found for query: probe")))
+            whenever(deviceManager.findDevice(eq("master"), eq("push")))
+                .thenReturn(Result.success(shorter))
+            whenever(deviceManager.findDevice(eq("master bedroom button"), eq("push")))
+                .thenReturn(Result.success(longer))
+
+            val mockResponse = mock<HttpResponse> {
+                on { status } doReturn HttpStatusCode.OK
+            }
+            whenever(networkClient.get(argThat { contains("/devices/2/push/2") }, any()))
+                .thenReturn(mockResponse)
+
+            val result = CommandHandlers.handleDeviceCommand(
+                bot, message, deviceManager, networkClient,
+                makerApiAppId, makerApiToken, defaultHubIp
+            )
+
+            result shouldBe "Done: Master Bedroom Button → push 2"
+        }
+
+        test("trailing and doubled whitespace does not produce phantom device names") {
+            val message = mock<Message> {
+                on { text } doReturn "/on  kitchen  lights "
+            }
+            val device = Device.VirtualSwitch(1, "Kitchen Lights")
+            whenever(deviceManager.findDevice(any(), any()))
+                .thenReturn(Result.failure(Exception("No device found for query: probe")))
+            whenever(deviceManager.findDevice(eq("kitchen lights"), eq("on")))
+                .thenReturn(Result.success(device))
+
+            val mockResponse = mock<HttpResponse> {
+                on { status } doReturn HttpStatusCode.OK
+            }
+            whenever(networkClient.get(any(), any())).thenReturn(mockResponse)
+
+            val result = CommandHandlers.handleDeviceCommand(
+                bot, message, deviceManager, networkClient,
+                makerApiAppId, makerApiToken, defaultHubIp
+            )
+
+            result shouldBe "Done: Kitchen Lights → on"
+        }
+
+        test("a command with only trailing whitespace asks for a device name") {
+            val message = mock<Message> {
+                on { text } doReturn "/on "
+            }
+
+            val result = CommandHandlers.handleDeviceCommand(
+                bot, message, deviceManager, networkClient,
+                makerApiAppId, makerApiToken, defaultHubIp
+            )
+
+            result shouldContain "Please specify a device name"
+        }
+
+        test("reports the full query when no split matches a device") {
+            val message = mock<Message> {
+                on { text } doReturn "/on unknown thing"
+            }
+            whenever(deviceManager.findDevice(any(), any()))
+                .thenReturn(Result.failure(Exception("No device found for query: probe")))
+
+            val result = CommandHandlers.handleDeviceCommand(
+                bot, message, deviceManager, networkClient,
+                makerApiAppId, makerApiToken, defaultHubIp
+            )
+
+            result shouldBe "No device found for query: unknown thing"
+        }
+    }
+
     context("handleListCommand") {
         test("should return device list grouped by type") {
             val expectedMap = mapOf(

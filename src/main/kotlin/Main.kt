@@ -233,9 +233,11 @@ private suspend fun getDevicesJson(): String =
 private fun isAuthorized(message: Message): Boolean {
     val allowed = config.isChatAllowed(message.chat.id)
     if (!allowed) {
+        // Log only the command token: full text from a stranger is both a
+        // privacy leak and a log-spam vector.
         logger.warn(
             "Dropping command from unauthorized chat {} (user {}): {}",
-            message.chat.id, message.from?.id, message.text
+            message.chat.id, message.from?.id, message.text?.split(" ")?.firstOrNull()?.take(64)
         )
     }
     return allowed

@@ -63,3 +63,4 @@ package-lock.json
 ### Deploy secrets ###
 # Real secrets live here; .env.example is the committed descriptor.
 .env__pycache__/
+catalog-refresh-summary.md

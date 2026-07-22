@@ -1,0 +1,35 @@
+name: Firmware catalog refresh
+
+on:
+  schedule:
+    # Weekly, Monday 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    name: Check Zooz firmware versions
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Refresh catalog from Zooz KB page
+        id: refresh
+        run: python3 .github/scripts/refresh_zooz_catalog.py
+
+      - name: Open PR with catalog changes
+        if: steps.refresh.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: firmware-catalog-refresh
+          commit-message: 'Refresh Zooz firmware catalog from vendor KB page'
+          title: 'Zooz firmware catalog: new vendor versions available'
+          body-path: catalog-refresh-summary.md
+          add-paths: src/main/resources/zwave-firmware-catalog.json
+          labels: enhancement
+          delete-branch: true

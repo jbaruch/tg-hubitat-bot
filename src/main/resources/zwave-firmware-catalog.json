@@ -128,6 +128,12 @@
           "installedMajor": [2],
           "latest": "2.30",
           "url": "https://www.getzooz.com/firmware/ZEN71_V02R30.gbl"
+        },
+        {
+          "line": "700-10x",
+          "installedMajor": [10],
+          "latest": "10.30",
+          "url": "https://www.getzooz.com/firmware/ZEN71_V10R30.gbl"
         }
       ]
     },
@@ -154,6 +160,12 @@
           "installedMajor": [2],
           "latest": "2.20",
           "url": "https://www.getzooz.com/firmware/ZEN72_V02R20.gbl"
+        },
+        {
+          "line": "700-10x",
+          "installedMajor": [10],
+          "latest": "10.40",
+          "url": "https://www.getzooz.com/firmware/ZEN72_V10R40.gbl"
         }
       ]
     },
@@ -177,9 +189,15 @@
         },
         {
           "line": "700",
-          "installedMajor": [2, 10],
+          "installedMajor": [2],
           "latest": "2.30",
           "url": "https://www.getzooz.com/firmware/ZEN76_V02R30.gbl"
+        },
+        {
+          "line": "700-10x",
+          "installedMajor": [10],
+          "latest": "10.30",
+          "url": "https://www.getzooz.com/firmware/ZEN76_V10R30.gbl"
         }
       ]
     },
@@ -211,6 +229,12 @@
           "installedMajor": [2],
           "latest": "2.40",
           "url": "https://www.getzooz.com/firmware/ZSE42_V02R40_US.gbl"
+        },
+        {
+          "line": "700",
+          "installedMajor": [1],
+          "latest": "1.50",
+          "url": "https://www.getzooz.com/firmware/ZSE42_V01R50_US.gbl"
         }
       ]
     },

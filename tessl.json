@@ -1,7 +1,9 @@
 {
   "name": "tg-hubitat-bot",
-  "mode": "vendored",
   "dependencies": {
+    "jbaruch/coding-policy": {
+      "version": "0.3.109"
+    },
     "jbaruch/hubitat-dev": {
       "version": "0.1.18"
     }

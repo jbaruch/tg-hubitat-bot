@@ -51,10 +51,7 @@ jobs:
           fi
           text="$(cat catalog-refresh-summary.md)"
           if [ -n "${PR_URL}" ]; then
-            text="${text}
-
-Catalog PR: ${PR_URL}
-Merge it, then /firmware shows which devices it applies to."
+            text="$(printf '%s\n\nCatalog PR: %s\nMerge it, then /firmware shows which devices it applies to.' "${text}" "${PR_URL}")"
           fi
           curl -sf -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${CHAT_ID}" \

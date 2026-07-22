@@ -228,6 +228,42 @@ class CommandHandlersTest : FunSpec({
             result shouldBe "OK"
         }
 
+        test("trailing and doubled whitespace does not produce phantom device names") {
+            val message = mock<Message> {
+                on { text } doReturn "/on  kitchen  lights "
+            }
+            val device = Device.VirtualSwitch(1, "Kitchen Lights")
+            whenever(deviceManager.findDevice(any(), any()))
+                .thenReturn(Result.failure(Exception("No device found for query: probe")))
+            whenever(deviceManager.findDevice(eq("kitchen lights"), eq("on")))
+                .thenReturn(Result.success(device))
+
+            val mockResponse = mock<HttpResponse> {
+                on { status } doReturn HttpStatusCode.OK
+            }
+            whenever(networkClient.get(any(), any())).thenReturn(mockResponse)
+
+            val result = CommandHandlers.handleDeviceCommand(
+                bot, message, deviceManager, networkClient,
+                makerApiAppId, makerApiToken, defaultHubIp
+            )
+
+            result shouldBe "OK"
+        }
+
+        test("a command with only trailing whitespace asks for a device name") {
+            val message = mock<Message> {
+                on { text } doReturn "/on "
+            }
+
+            val result = CommandHandlers.handleDeviceCommand(
+                bot, message, deviceManager, networkClient,
+                makerApiAppId, makerApiToken, defaultHubIp
+            )
+
+            result shouldContain "Please specify a device name"
+        }
+
         test("reports the full query when no split matches a device") {
             val message = mock<Message> {
                 on { text } doReturn "/on unknown thing"

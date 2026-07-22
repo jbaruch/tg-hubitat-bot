@@ -22,7 +22,9 @@ object CommandHandlers {
         makerApiToken: String,
         defaultHubIp: String
     ): String {
-        val parts = message.text?.split(" ") ?: return "Please specify a device name for the command."
+        // Trim + split on runs of whitespace: "/on " or doubled spaces must not
+        // produce empty tokens that the multi-token name search would probe.
+        val parts = message.text?.trim()?.split(Regex("\\s+")) ?: emptyList()
         if (parts.size < 2) {
             return "Please specify a device name for the command."
         }

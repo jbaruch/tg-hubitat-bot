@@ -53,6 +53,8 @@ object FirmwareOperations {
     private val json = Json { ignoreUnknownKeys = true }
 
     private const val CATALOG_RESOURCE = "/zwave-firmware-catalog.json"
+    internal const val CATALOG_URL =
+        "https://raw.githubusercontent.com/jbaruch/tg-hubitat-bot/main/src/main/resources/zwave-firmware-catalog.json"
     private const val MAX_MESSAGE_LENGTH = 3900
 
     fun loadCatalog(): FirmwareCatalog {
@@ -61,11 +63,25 @@ object FirmwareOperations {
         return json.decodeFromString<FirmwareCatalog>(resource.bufferedReader().readText())
     }
 
+    /**
+     * The catalog is read from the repo's main branch so that merging a
+     * catalog-refresh PR is enough for /firmware to know the new versions — no
+     * bot redeploy. The bundled copy is the offline fallback, and the report
+     * header says so when it is used.
+     */
+    suspend fun fetchCatalog(networkClient: NetworkClient): Pair<FirmwareCatalog, String?> =
+        try {
+            json.decodeFromString<FirmwareCatalog>(networkClient.getBody(CATALOG_URL)) to null
+        } catch (e: Exception) {
+            logger.warn("Could not fetch live firmware catalog, using bundled copy: {}", e.message)
+            loadCatalog() to "bundled fallback — live catalog unreachable"
+        }
+
     suspend fun checkFirmware(
         hubs: List<Device.Hub>,
         networkClient: NetworkClient
     ): List<String> {
-        val catalog = loadCatalog()
+        val (catalog, catalogNote) = fetchCatalog(networkClient)
         val findings = mutableListOf<FirmwareFinding>()
         val hubErrors = mutableListOf<String>()
 
@@ -79,7 +95,7 @@ object FirmwareOperations {
             }
         }
 
-        return formatReport(findings, catalog, hubErrors)
+        return formatReport(findings, catalog, hubErrors, catalogNote)
     }
 
     suspend fun collectZwaveDevices(
@@ -230,14 +246,16 @@ object FirmwareOperations {
     fun formatReport(
         findings: List<FirmwareFinding>,
         catalog: FirmwareCatalog,
-        hubErrors: List<String> = emptyList()
+        hubErrors: List<String> = emptyList(),
+        catalogNote: String? = null
     ): List<String> {
         val byStatus = findings.groupBy { it.status }
         val sections = mutableListOf<String>()
 
         val hubCount = findings.map { it.device.hubLabel }.distinct().size
+        val catalogSuffix = if (catalogNote != null) " ($catalogNote)" else ""
         sections.add(
-            "Z-Wave firmware report: ${findings.size} devices on $hubCount hub(s), catalog ${catalog.catalogVersion}"
+            "Z-Wave firmware report: ${findings.size} devices on $hubCount hub(s), catalog ${catalog.catalogVersion}$catalogSuffix"
         )
 
         byStatus[FirmwareStatus.UPDATE_AVAILABLE]?.let { updates ->

@@ -242,6 +242,36 @@ class FirmwareOperationsTest : FunSpec({
         }
     }
 
+    context("catalog fetching") {
+        test("uses the live catalog from the repo main branch when reachable") {
+            val networkClient = mock<NetworkClient>()
+            whenever(networkClient.getBody(argThat { equals(FirmwareOperations.CATALOG_URL) }, any()))
+                .thenReturn("""{"catalogVersion": "live-version", "entries": []}""")
+
+            val (catalog, note) = FirmwareOperations.fetchCatalog(networkClient)
+
+            catalog.catalogVersion shouldBe "live-version"
+            note shouldBe null
+        }
+
+        test("falls back to the bundled catalog when the live one is unreachable, and says so") {
+            val networkClient = mock<NetworkClient>()
+            whenever(networkClient.getBody(any(), any())).thenThrow(RuntimeException("no route to host"))
+
+            val (catalog, note) = FirmwareOperations.fetchCatalog(networkClient)
+
+            catalog.entries.shouldNotBeEmpty()
+            note.shouldNotBeNull() shouldContain "bundled fallback"
+        }
+
+        test("the fallback note surfaces in the report header") {
+            val report = FirmwareOperations.formatReport(
+                emptyList(), testCatalog, catalogNote = "bundled fallback — live catalog unreachable"
+            ).joinToString("\n\n")
+            report shouldContain "catalog test (bundled fallback"
+        }
+    }
+
     context("collecting devices from a hub") {
         val hub = Device.Hub(1, "Test Hub", ip = "192.168.1.50")
 

@@ -6,11 +6,13 @@ compares each against the catalog's Zooz lines (matched by the major version of
 the line's current `latest`), and rewrites the catalog in place when a newer
 file exists. Non-Zooz vendors are never touched.
 
-Prints a human-readable summary and, when GITHUB_OUTPUT is set, emits
-`changed=true|false` plus writes the summary to `catalog-refresh-summary.md`
-for use as a PR body. Exits non-zero on any scrape/parse failure so a broken
-page shape fails the workflow visibly instead of silently reporting "no
-changes".
+Prints a human-readable summary and, when GITHUB_OUTPUT is set, emits two
+flags: `changed` (the catalog file was rewritten - a PR is needed) and `news`
+(anything newsworthy was found, including new hardware lines that need manual
+cataloging - a Telegram ping is warranted). The summary is written to
+`catalog-refresh-summary.md` for use as the PR body and the notification text.
+Exits non-zero on any scrape/parse failure so a broken page shape fails the
+workflow visibly instead of silently reporting "no changes".
 """
 
 import json
@@ -117,6 +119,7 @@ def main() -> None:
     if github_output:
         with open(github_output, "a") as handle:
             handle.write(f"changed={'true' if catalog_changed else 'false'}\n")
+            handle.write(f"news={'true' if changes else 'false'}\n")
 
 
 if __name__ == "__main__":

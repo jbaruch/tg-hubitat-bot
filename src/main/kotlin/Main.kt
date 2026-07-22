@@ -153,7 +153,7 @@ fun main() {
                     }
                 } catch (e: Exception) {
                     logger.error("List command failed", e)
-                    bot.sendMessage(chatId = chatId, text = "Error listing devices: ${e.message ?: e.javaClass.simpleName}")
+                    bot.sendMessage(chatId = chatId, text = "Something went wrong listing devices. Check the bot logs for details.")
                 }
             }
 
@@ -234,7 +234,10 @@ private fun replyTo(bot: Bot, message: Message, block: suspend () -> String) {
         runBlocking { block() }
     } catch (e: Exception) {
         logger.error("Handler for '${message.text}' failed", e)
-        "Error handling '${message.text}': ${e.message ?: e.javaClass.simpleName}"
+        // Keep the details (URLs, stack) in the logs - exception messages can
+        // carry internals that don't belong in a chat reply.
+        val command = message.text?.split(" ")?.firstOrNull() ?: "command"
+        "Something went wrong handling $command. Check the bot logs for details."
     }
     bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = text)
 }

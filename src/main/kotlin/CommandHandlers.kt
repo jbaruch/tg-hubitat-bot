@@ -202,12 +202,14 @@ object CommandHandlers {
             mapOf("access_token" to makerApiToken)
         )
         // A raw HTTP reason phrase ("Not Found") reads like noise, and a non-2xx
-        // used to be reported in the same voice as success. Say what happened.
+        // used to be reported in the same voice as success. Say what happened,
+        // in the snake_case form the user actually typed.
+        val displayCommand = command.camelToSnakeCase()
         val argSuffix = if (args.isEmpty()) "" else " ${args.joinToString(" ")}"
         return if (response.status.isSuccess()) {
-            "Done: ${device.label} → $command$argSuffix"
+            "Done: ${device.label} → $displayCommand$argSuffix"
         } else {
-            "Failed: ${device.label} → $command$argSuffix returned HTTP ${response.status}"
+            "Failed: ${device.label} → $displayCommand$argSuffix returned HTTP ${response.status}"
         }
     }
     

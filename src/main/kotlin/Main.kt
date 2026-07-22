@@ -157,6 +157,13 @@ fun main() {
                         )
                     }
                 } catch (e: Exception) {
+                    // outer-boundary-process-contract: Telegram dispatcher
+                    // boundary (multi-message handler, so it cannot use
+                    // replyTo). Silent-failure shape: an escaping exception
+                    // dies in the dispatcher and the user gets no reply.
+                    // Emitted response: a short generic error; details stay in
+                    // the logs. Propagation would break the every-command-
+                    // answers contract.
                     logger.error("List command failed", e)
                     bot.sendMessage(chatId = chatId, text = "Something went wrong listing devices. Check the bot logs for details.")
                 }
@@ -243,9 +250,14 @@ private fun replyTo(bot: Bot, message: Message, block: suspend () -> String) {
     val text = try {
         runBlocking { block() }
     } catch (e: Exception) {
+        // outer-boundary-process-contract: Telegram dispatcher boundary.
+        // Silent-failure shape: an exception escaping a handler dies inside
+        // the dispatcher thread and the user gets no reply at all - the bot
+        // looks dead. Emitted response: a short generic error (exception
+        // details, which can carry internal URLs, stay in the logs). Letting
+        // it propagate would break the contract that every command answers
+        // the chat.
         logger.error("Handler for '${message.text}' failed", e)
-        // Keep the details (URLs, stack) in the logs - exception messages can
-        // carry internals that don't belong in a chat reply.
         val command = message.text?.split(" ")?.firstOrNull() ?: "command"
         "Something went wrong handling $command. Check the bot logs for details."
     }

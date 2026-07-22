@@ -35,7 +35,10 @@ class KtorNetworkClient(private val client: HttpClient) : NetworkClient {
         // that expect mid-operation failures (hub rebooting during /update) catch
         // this and treat it as "not ready yet".
         if (!response.status.isSuccess()) {
-            throw IllegalStateException("GET $url failed: HTTP ${response.status}")
+            throw IllegalStateException(
+                "GET $url failed: HTTP ${response.status}. " +
+                    "Check that the hub is reachable and the Maker API app id/token are valid, then retry."
+            )
         }
         val body = response.body<String>()
         if (isSecretResponse(url)) {

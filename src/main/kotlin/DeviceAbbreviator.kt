@@ -34,6 +34,7 @@ class DeviceAbbreviator {
     }
 
     private val deviceAbbreviationMap: MutableMap<String, DeviceAbbreviation> = mutableMapOf()
+    private val unabbreviatable: MutableSet<String> = mutableSetOf()
     private var isAbbreviated = false
 
     fun addName(name: String) {
@@ -44,7 +45,24 @@ class DeviceAbbreviator {
     fun abbreviate() {
         var collisions = getShortestCollidingAbbreviations()
         while (collisions.isNotEmpty()) {
+            val before = collisions.map { it.getAbbreviation() }
             incrementAbbreviations(collisions)
+            val after = collisions.map { it.getAbbreviation() }
+            if (before == after) {
+                // Every token in the colliding group is fully expanded and the
+                // abbreviations are still identical (e.g. "a b" vs "ab" - both
+                // can only ever reach "ab"). These names can never diverge, so
+                // iterating further would loop forever and hang the whole boot.
+                // Drop them from the abbreviation map and remember why:
+                // getAbbreviation() then fails with a dedicated message,
+                // DeviceManager emits its "Device name was not abbreviated"
+                // warning, and the devices stay reachable by full name.
+                val stuck = collisions.toSet()
+                deviceAbbreviationMap.entries
+                    .filter { it.value in stuck }
+                    .forEach { unabbreviatable.add(it.key) }
+                deviceAbbreviationMap.entries.removeIf { it.value in stuck }
+            }
             collisions = getShortestCollidingAbbreviations()
         }
         isAbbreviated = true
@@ -85,7 +103,16 @@ class DeviceAbbreviator {
     }
 
     fun getAbbreviation(fullName: String): Result<String> {
-        val abbreviation = this.deviceAbbreviationMap[fullName]?.getAbbreviation() ?: return Result.failure(
+        // Normalize like addName() stores: lookups must be case-insensitive.
+        val key = fullName.lowercase()
+        if (key in unabbreviatable) {
+            return Result.failure(
+                IllegalStateException(
+                    "$fullName cannot be abbreviated: its abbreviation collides irreconcilably with another device name"
+                )
+            )
+        }
+        val abbreviation = this.deviceAbbreviationMap[key]?.getAbbreviation() ?: return Result.failure(
             IllegalArgumentException("$fullName name was not added to this DeviceAbbreviator instance")
         )
         return Result.success(abbreviation)

@@ -29,6 +29,14 @@ class DeviceAbbreviatorTest {
         }
 
         @Test
+        fun `test lookup is case-insensitive like storage`() {
+            abbreviator.addName("Kitchen Light")
+            abbreviator.abbreviate()
+
+            assertEquals("kl", abbreviator.getAbbreviation("Kitchen Light").getOrThrow())
+        }
+
+        @Test
         fun `test multiple abbreviations without collision`() {
             // Add multiple device names that don't collide
             abbreviator.addName("Kitchen Light")
@@ -86,6 +94,48 @@ class DeviceAbbreviatorTest {
             }
 
             assertTrue(exception.message!!.contains("Cannot add more devices"))
+        }
+
+        @Test
+        fun `test names that can never diverge terminate with failed abbreviations`() {
+            // "az" collides with "ab" on the initial "a" and forces it to fully
+            // expand to "ab" - which is exactly "a b"'s abbreviation, and both
+            // are fully expanded so they can never diverge. Before the
+            // stuck-group detection this looped forever and hung the boot.
+            val stuck = DeviceAbbreviator()
+            stuck.addName("a b")
+            stuck.addName("ab")
+            stuck.addName("az")
+            stuck.addName("Kitchen Lights")
+
+            stuck.abbreviate()
+
+            val failure = stuck.getAbbreviation("a b")
+            assertTrue(failure.isFailure)
+            // The failure names the real cause, not "was not added".
+            assertTrue(failure.exceptionOrNull()!!.message!!.contains("cannot be abbreviated"))
+            assertTrue(stuck.getAbbreviation("ab").isFailure)
+            // Unrelated names still abbreviate normally.
+            assertEquals("az", stuck.getAbbreviation("az").getOrThrow())
+            assertEquals("kl", stuck.getAbbreviation("kitchen lights").getOrThrow())
+        }
+
+        @Test
+        fun `test stuck group does not block other collisions from resolving`() {
+            val stuck = DeviceAbbreviator()
+            stuck.addName("a b")
+            stuck.addName("ab")
+            stuck.addName("az")
+            stuck.addName("Main Bedroom Lights")
+            stuck.addName("Main Bathroom Lights")
+
+            stuck.abbreviate()
+
+            assertTrue(stuck.getAbbreviation("a b").isFailure)
+            assertTrue(stuck.getAbbreviation("ab").isFailure)
+            val bedroom = stuck.getAbbreviation("main bedroom lights").getOrThrow()
+            val bathroom = stuck.getAbbreviation("main bathroom lights").getOrThrow()
+            assertTrue(bedroom != bathroom)
         }
     }
 }

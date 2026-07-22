@@ -8,7 +8,7 @@ on:
 
 jobs:
   refresh:
-    name: Check Zooz firmware versions
+    name: Check vendor firmware versions
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -18,9 +18,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Refresh catalog from Zooz KB page
+      - name: Refresh catalog from vendor servers
         id: refresh
-        run: python3 .github/scripts/refresh_zooz_catalog.py
+        run: python3 .github/scripts/refresh_firmware_catalog.py
 
       - name: Open PR with catalog changes
         id: pr
@@ -28,8 +28,8 @@ jobs:
         uses: peter-evans/create-pull-request@v7
         with:
           branch: firmware-catalog-refresh
-          commit-message: 'Refresh Zooz firmware catalog from vendor KB page'
-          title: 'Zooz firmware catalog: new vendor versions available'
+          commit-message: 'Refresh firmware catalog from vendor servers'
+          title: 'Firmware catalog: new vendor versions available'
           body-path: catalog-refresh-summary.md
           add-paths: src/main/resources/zwave-firmware-catalog.json
           labels: enhancement

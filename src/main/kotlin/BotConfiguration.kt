@@ -20,7 +20,10 @@ data class BotConfiguration(
 
     companion object {
         fun fromEnvironment(): BotConfiguration {
-            val chatId = getenv("CHAT_ID") ?: ""
+            // Trimmed so the stored value matches what the allowlist validated -
+            // an untrimmed value would pass validation here and still crash the
+            // startup-message toLong() later.
+            val chatId = (getenv("CHAT_ID") ?: "").trim()
             return BotConfiguration(
                 botToken = getenv("BOT_TOKEN") ?: throw IllegalStateException("BOT_TOKEN not set"),
                 makerApiAppId = getenv("MAKER_API_APP_ID") ?: throw IllegalStateException("MAKER_API_APP_ID not set"),

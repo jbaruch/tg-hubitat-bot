@@ -6,6 +6,12 @@ import jbaru.ch.telegram.hubitat.model.FirmwareCatalog
 import jbaru.ch.telegram.hubitat.model.FirmwareLine
 import jbaru.ch.telegram.hubitat.model.firmwareMajor
 import jbaru.ch.telegram.hubitat.model.parseFirmwareVersion
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -110,21 +116,41 @@ object FirmwareOperations {
             .mapNotNull { it.jsonObject["data"] as? JsonObject }
             .filter { it["isZwave"]?.jsonPrimitive?.booleanOrNull == true }
 
-        return zwaveEntries.map { data ->
-            val id = data["id"]!!.jsonPrimitive.content.toInt()
-            val base = ZwaveDeviceInfo(
-                hubLabel = hub.label,
-                deviceId = id,
-                dni = data["dni"]?.jsonPrimitive?.content ?: "",
-                name = data["name"]?.jsonPrimitive?.content ?: "device $id",
-                driverType = data["type"]?.jsonPrimitive?.content ?: ""
-            )
-            try {
-                readDeviceFirmware(base, hub, networkClient)
-            } catch (e: Exception) {
-                logger.warn("Failed to read firmware info for '{}' on {}: {}", base.name, hub.label, e.message)
-                base.copy(readError = e.message ?: e.toString())
-            }
+        // Two HTTP calls per device add up on a large mesh - fetch concurrently,
+        // capped so the hub isn't stampeded.
+        val semaphore = Semaphore(8)
+        return coroutineScope {
+            zwaveEntries.map { data ->
+                async {
+                    val id = data["id"]!!.jsonPrimitive.content.toInt()
+                    val base = ZwaveDeviceInfo(
+                        hubLabel = hub.label,
+                        deviceId = id,
+                        dni = data["dni"]?.jsonPrimitive?.content ?: "",
+                        name = data["name"]?.jsonPrimitive?.content ?: "device $id",
+                        driverType = data["type"]?.jsonPrimitive?.content ?: ""
+                    )
+                    semaphore.withPermit {
+                        try {
+                            readDeviceFirmware(base, hub, networkClient)
+                        } catch (e: CancellationException) {
+                            // Never swallow structured-concurrency cancellation.
+                            throw e
+                        }
+                        // outer-boundary-process-contract: per-device fan-out
+                        // boundary. Silent-failure shape: one unreadable
+                        // device aborting the whole /firmware report.
+                        // Emitted response: the device is reported with its
+                        // readError in the UNREADABLE section; the exception
+                        // is logged here. Propagation would trade the whole
+                        // report for one flaky device.
+                        catch (e: Exception) {
+                            logger.warn("Failed to read firmware info for '{}' on {}: {}", base.name, hub.label, e.message)
+                            base.copy(readError = e.message ?: e.toString())
+                        }
+                    }
+                }
+            }.awaitAll()
         }
     }
 

@@ -5,6 +5,12 @@ import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.Message
 import io.ktor.http.isSuccess
 import jbaru.ch.telegram.hubitat.model.Device
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -119,21 +125,49 @@ object CommandHandlers {
         makerApiAppId: String,
         makerApiToken: String,
         defaultHubIp: String
-    ): String {
-        val openSensors = deviceManager.findDevicesByType(Device.ContactSensor::class.java)
-            .mapNotNull { sensor ->
-                val currentValue = getDeviceAttribute(sensor, "contact", networkClient, makerApiAppId, makerApiToken, defaultHubIp)
-                if (currentValue == "open") {
-                    sensor.label
-                } else {
-                    null
+    ): String = coroutineScope {
+        // One HTTP call per sensor: run them concurrently (capped so a large
+        // fleet doesn't stampede the hub), and never let one unreachable
+        // sensor take down the whole report - it is listed as unreadable
+        // instead.
+        val semaphore = Semaphore(8)
+        val states = deviceManager.findDevicesByType(Device.ContactSensor::class.java)
+            .map { sensor ->
+                async {
+                    semaphore.withPermit {
+                        try {
+                            sensor to getDeviceAttribute(
+                                sensor, "contact", networkClient, makerApiAppId, makerApiToken, defaultHubIp
+                            )
+                        } catch (e: CancellationException) {
+                            // Never swallow structured-concurrency cancellation.
+                            throw e
+                        }
+                        // outer-boundary-process-contract: per-sensor fan-out
+                        // boundary. Silent-failure shape: one unreachable
+                        // sensor aborting the whole /get_open_sensors report.
+                        // Emitted response: the sensor is listed under
+                        // "Could not read" in the reply; the exception is
+                        // logged here. Propagation would trade the whole
+                        // report for one flaky sensor.
+                        catch (e: Exception) {
+                            logger.warn("Could not read contact state of '{}': {}", sensor.label, e.message)
+                            sensor to null
+                        }
+                    }
                 }
-            }.joinToString(separator = "\n")
+            }.awaitAll()
 
-        return if (openSensors.isNotEmpty()) {
-            "Open Sensors:\n$openSensors"
-        } else {
-            "No open sensors found."
+        val openSensors = states.filter { it.second == "open" }.joinToString("\n") { it.first.label }
+        val unreadable = states.filter { it.second == null }.joinToString(", ") { it.first.label }
+
+        buildString {
+            append(
+                if (openSensors.isNotEmpty()) "Open Sensors:\n$openSensors" else "No open sensors found."
+            )
+            if (unreadable.isNotEmpty()) {
+                append("\nCould not read: $unreadable")
+            }
         }
     }
     

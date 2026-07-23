@@ -58,38 +58,51 @@ object HubOperations {
         // Per-hub resilience: a hub that cannot be initialized is skipped with
         // a warning, so one bad hub never blocks startup.
         for (hub in hubs) {
-            onExpectedFailure(
+            val ready = onExpectedFailureSuspend(
                 onFailure = { e ->
                     val reason = KtorNetworkClient.redactSecrets(e.message?.substringBefore('\n'))
                     logger.warn("Skipping hub '${hub.label}' (id=${hub.id}): $reason")
+                    null
                 }
             ) {
-                val json = Json.parseToJsonElement(
-                    networkClient.getBody(
-                        "http://${hubIp}/apps/api/${makerApiAppId}/devices/${hub.id}",
-                        mapOf("access_token" to makerApiToken)
-                    )
-                ).jsonObject
-
-                val ip = (json["attributes"] as? JsonArray)
-                    ?.firstOrNull { it.jsonObject["name"]?.jsonPrimitive?.content == "localIP" }
-                    ?.jsonObject?.get("currentValue")?.jsonPrimitive?.content
-
-                if (ip.isNullOrBlank()) {
-                    logger.warn(
-                        "Skipping hub '${hub.label}' (id=${hub.id}): no localIP attribute exposed via Maker API"
-                    )
-                    continue
-                }
-
-                hub.ip = ip
-                hub.managementToken = networkClient.getBody("http://${ip}/hub/advanced/getManagementToken")
-                initialized.add(hub)
+                initializeHub(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
             }
+            if (ready != null) initialized.add(ready)
         }
         return initialized
     }
     
+    /** @return the hub with ip/managementToken set, or null when it exposes no usable localIP. */
+    private suspend fun initializeHub(
+        hub: Device.Hub,
+        networkClient: NetworkClient,
+        hubIp: String,
+        makerApiAppId: String,
+        makerApiToken: String
+    ): Device.Hub? {
+        val json = Json.parseToJsonElement(
+            networkClient.getBody(
+                "http://${hubIp}/apps/api/${makerApiAppId}/devices/${hub.id}",
+                mapOf("access_token" to makerApiToken)
+            )
+        ).jsonObject
+
+        val ip = (json["attributes"] as? JsonArray)
+            ?.firstOrNull { it.jsonObject["name"]?.jsonPrimitive?.content == "localIP" }
+            ?.jsonObject?.get("currentValue")?.jsonPrimitive?.content
+
+        if (ip.isNullOrBlank()) {
+            logger.warn(
+                "Skipping hub '${hub.label}' (id=${hub.id}): no localIP attribute exposed via Maker API"
+            )
+            return null
+        }
+
+        hub.ip = ip
+        hub.managementToken = networkClient.getBody("http://${ip}/hub/advanced/getManagementToken")
+        return hub
+    }
+
     private fun validateHubInfoResponse(hub: Device.Hub, endpoint: String, responseBody: String) {
         val problem = when {
             responseBody.isBlank() ->
@@ -161,7 +174,7 @@ object HubOperations {
 
         // Per-hub resilience: a failed request becomes a per-hub status line.
         for (hub in hubs) {
-            onExpectedFailure(onFailure = { statusMap[hub.label] = HttpStatusCode.InternalServerError }) {
+            onExpectedFailureSuspend(onFailure = { statusMap[hub.label] = HttpStatusCode.InternalServerError }) {
                 val response = networkClient.get(
                     "http://${hub.ip}/management/firmwareUpdate",
                     mapOf("token" to hub.managementToken)
@@ -229,7 +242,7 @@ object HubOperations {
     ): Map<String, HubVersionInfo> {
         val versionInfo = mutableMapOf<String, HubVersionInfo>()
         for (hub in hubs) {
-            onExpectedFailure(
+            onExpectedFailureSuspend(
                 onFailure = { e ->
                     val reason = KtorNetworkClient.redactSecrets(e.message)
                     throw IllegalStateException("Failed to get version info for hub ${hub.label}: $reason", e)
@@ -248,10 +261,10 @@ object HubOperations {
         progressCallback: suspend (String) -> Unit
     ): Result<Unit> {
         for (hub in hubs) {
-            onExpectedFailure(
+            val attempt = onExpectedFailureSuspend(
                 onFailure = { e ->
                     val reason = KtorNetworkClient.redactSecrets(e.message)
-                    return Result.failure(
+                    Result.failure(
                         IllegalStateException("Failed to initiate update for hub ${hub.label}: $reason", e)
                     )
                 }
@@ -261,12 +274,15 @@ object HubOperations {
                     mapOf("token" to hub.managementToken)
                 )
                 if (response.status != HttpStatusCode.OK) {
-                    return Result.failure(
+                    Result.failure(
                         IllegalStateException("Failed to initiate update for hub ${hub.label}: ${response.status}")
                     )
+                } else {
+                    progressCallback("Update initiated for hub ${hub.label}")
+                    Result.success(Unit)
                 }
-                progressCallback("Update initiated for hub ${hub.label}")
             }
+            if (attempt.isFailure) return attempt
         }
         return Result.success(Unit)
     }
@@ -306,7 +322,7 @@ object HubOperations {
             val updatedHubs = mutableSetOf<String>()
             for (hubLabel in currentProgress.inProgressHubs) {
                 val hub = hubs.find { it.label == hubLabel } ?: continue
-                onExpectedFailure(
+                onExpectedFailureSuspend(
                     onFailure = {
                         // Hub unreachable / empty response: it is rebooting to
                         // apply the update. Keep waiting; do not mark it failed.

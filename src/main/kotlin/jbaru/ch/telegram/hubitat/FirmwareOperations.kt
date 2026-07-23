@@ -80,7 +80,7 @@ object FirmwareOperations {
     // An expected failure - network, HTTP, malformed JSON - falls back to the
     // bundled catalog rather than kill /firmware; the note in the report says so.
     suspend fun fetchCatalog(networkClient: NetworkClient): Pair<FirmwareCatalog, String?> =
-        onExpectedFailure(
+        onExpectedFailureSuspend(
             onFailure = { e ->
                 logger.warn("Could not fetch live firmware catalog, using bundled copy: {}", e.message)
                 loadCatalog() to "bundled fallback — live catalog unreachable"
@@ -100,7 +100,7 @@ object FirmwareOperations {
         // Per-hub resilience: one unreachable hub becomes a report line, not a
         // dead /firmware command.
         for (hub in hubs.filter { it.ip.isNotBlank() }) {
-            onExpectedFailure(
+            onExpectedFailureSuspend(
                 onFailure = { e ->
                     logger.error("Failed to collect Z-Wave devices from hub ${hub.label}", e)
                     hubErrors.add("${hub.label}: ${KtorNetworkClient.redactSecrets(e.message ?: e.toString())}")

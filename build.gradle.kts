@@ -35,6 +35,7 @@ val ktor_version: String by project
 val logback_version: String by project
 val kotlin_tg_bot_version: String by project
 val kotlinx_serialization_version: String by project
+val kotlinx_coroutines_version: String by project
 val kotest_version: String by project
 
 dependencies {
@@ -53,6 +54,9 @@ dependencies {
     implementation("io.ktor:ktor-client-cio:$ktor_version")
     implementation("ch.qos.logback:logback-classic:$logback_version")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinx_serialization_version")
+    // Used directly (async/awaitAll/Semaphore in the sensor and firmware
+    // fan-outs), so declared explicitly rather than relied on transitively.
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinx_coroutines_version")
     
     // Kotest for property-based testing
     testImplementation("io.kotest:kotest-runner-junit5:$kotest_version")

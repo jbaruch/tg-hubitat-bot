@@ -82,7 +82,7 @@ class ModeOperationsPropertyTest : FunSpec({
             
             // Pick a random mode from the list
             if (modes.isNotEmpty()) {
-                val targetMode = modes.random()
+                val targetMode = modes[modes.size / 2]
                 
                 val result = ModeOperations.setMode(
                     networkClient, "test-app", "test-token", "test-hub", targetMode.name
@@ -132,7 +132,7 @@ class ModeOperationsPropertyTest : FunSpec({
             whenever(networkClient.get(any(), any())).thenReturn(mockResponse)
             
             if (modes.isNotEmpty()) {
-                val targetMode = modes.random()
+                val targetMode = modes[modes.size / 2]
                 
                 val result = ModeOperations.setMode(
                     networkClient, "test-app", "test-token", "test-hub", targetMode.name

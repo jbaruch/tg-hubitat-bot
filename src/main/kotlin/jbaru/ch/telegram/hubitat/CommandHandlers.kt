@@ -83,11 +83,11 @@ object CommandHandlers {
         logger.warn("Device command '{}' failed: {}", snakeCaseCommand, error)
         return error
     }
-    
+
     suspend fun handleListCommand(deviceManager: DeviceManager): Map<String, String> {
         return deviceManager.listByType()
     }
-    
+
     suspend fun handleRefreshCommand(
         deviceManager: DeviceManager,
         networkClient: NetworkClient,
@@ -101,7 +101,7 @@ object CommandHandlers {
         )
         return deviceManager.refreshDevices(devicesJson)
     }
-    
+
     suspend fun handleCancelAlertsCommand(
         networkClient: NetworkClient,
         makerApiAppId: String,
@@ -119,7 +119,7 @@ object CommandHandlers {
                 "Check that Maker API control of HSM is allowed and the hub is reachable, then retry."
         }
     }
-    
+
     suspend fun handleGetOpenSensorsCommand(
         deviceManager: DeviceManager,
         networkClient: NetworkClient,
@@ -177,7 +177,7 @@ object CommandHandlers {
         if (reply.length <= MAX_MESSAGE_LENGTH) reply
         else reply.take(MAX_MESSAGE_LENGTH) + "\n… (truncated)"
     }
-    
+
     suspend fun handleGetModeCommand(
         networkClient: NetworkClient,
         makerApiAppId: String,
@@ -191,7 +191,7 @@ object CommandHandlers {
             onFailure = { e -> "Error getting current mode: ${e.message}" }
         )
     }
-    
+
     suspend fun handleListModesCommand(
         networkClient: NetworkClient,
         makerApiAppId: String,
@@ -214,7 +214,7 @@ object CommandHandlers {
             onFailure = { e -> "Error listing modes: ${e.message}" }
         )
     }
-    
+
     suspend fun handleSetModeCommand(
         message: Message,
         networkClient: NetworkClient,
@@ -226,9 +226,9 @@ object CommandHandlers {
         if (parts.size < 2) {
             return "Please specify a mode name. Usage: /set_mode <mode_name>"
         }
-        
+
         val modeName = parts.drop(1).joinToString(" ")
-        
+
         return ModeOperations.setMode(
             networkClient, makerApiAppId, makerApiToken, hubIp, modeName
         ).fold(
@@ -247,7 +247,7 @@ object CommandHandlers {
             }
         )
     }
-    
+
     private fun logUnreadableSensor(label: String, e: Exception) {
         logger.warn("Could not read contact state of '{}': {}", label, KtorNetworkClient.redactSecrets(e.message))
     }
@@ -284,7 +284,7 @@ object CommandHandlers {
                 "Check that the device is reachable and exposed in Maker API, then retry."
         }
     }
-    
+
     private suspend fun getDeviceAttribute(
         device: Device,
         attribute: String,

@@ -5,6 +5,7 @@ import io.ktor.client.HttpClient
 import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.bot
 import com.github.kotlintelegrambot.dispatch
+import com.github.kotlintelegrambot.dispatcher.Dispatcher
 import com.github.kotlintelegrambot.dispatcher.command
 import com.github.kotlintelegrambot.dispatcher.message
 import com.github.kotlintelegrambot.entities.ChatId
@@ -14,6 +15,7 @@ import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import io.ktor.http.HttpStatusCode
+import kotlinx.coroutines.CancellationException
 import jbaru.ch.telegram.hubitat.model.Device
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -56,7 +58,7 @@ fun main() {
     deviceManager = runBlocking {
         DeviceManager(getDevicesJson())
     }
-    hubs = runBlocking { 
+    hubs = runBlocking {
         HubOperations.initializeHubs(
             deviceManager, networkClient, config.defaultHubIp,
             config.makerApiAppId, config.makerApiToken
@@ -68,158 +70,198 @@ fun main() {
         logLevel = LogLevel.Network.Basic
 
         dispatch {
-
-            message(DeviceCommandFilter({ deviceManager })) {
-                if (!isAuthorized(message)) return@message
-                replyTo(bot, message) {
-                    CommandHandlers.handleDeviceCommand(
-                        message, deviceManager, networkClient,
-                        config.makerApiAppId, config.makerApiToken, config.defaultHubIp
-                    )
-                }
-            }
-
-            command("cancel_alerts") {
-                if (!isAuthorized(message)) return@command
-                replyTo(bot, message) {
-                    CommandHandlers.handleCancelAlertsCommand(
-                        networkClient, config.makerApiAppId, config.makerApiToken, config.defaultHubIp
-                    )
-                }
-            }
-
-            command("update") {
-                if (!isAuthorized(message)) return@command
-                replyTo(bot, message) {
-                    HubOperations.updateHubsWithPolling(
-                        hubs,
-                        networkClient,
-                        config.defaultHubIp,
-                        config.makerApiAppId,
-                        config.makerApiToken,
-                        progressCallback = { progressMessage ->
-                            bot.sendMessage(
-                                chatId = ChatId.fromId(message.chat.id),
-                                text = progressMessage
-                            )
-                        }
-                    ).fold(
-                        onSuccess = { it },
-                        onFailure = {
-                            // The per-hub detail already reached the chat via
-                            // progressCallback; the exception text can carry
-                            // internal URLs, so it stays in the logs.
-                            logger.error("Hub update failed", it)
-                            "Hub update failed. See the progress messages above; details are in the bot logs."
-                        }
-                    )
-                }
-            }
-
-            command("firmware") {
-                if (!isAuthorized(message)) return@command
-                val chatId = ChatId.fromId(message.chat.id)
-                val messages = runBlocking {
-                    try {
-                        FirmwareOperations.checkFirmware(hubs, networkClient)
-                    } catch (e: Exception) {
-                        logger.error("Firmware check failed", e)
-                        listOf("Firmware check failed: ${e.message}")
-                    }
-                }
-                messages.forEach { bot.sendMessage(chatId = chatId, text = it) }
-            }
-
-            command("refresh") {
-                if (!isAuthorized(message)) return@command
-                replyTo(bot, message) {
-                    val results = CommandHandlers.handleRefreshCommand(
-                        deviceManager, networkClient,
-                        config.makerApiAppId, config.makerApiToken, config.defaultHubIp
-                    )
-                    // Re-initialize hubs too, so a hub added/changed since boot is
-                    // picked up (and its ip/managementToken refreshed) without a restart.
-                    hubs = HubOperations.initializeHubs(
-                        deviceManager, networkClient, config.defaultHubIp,
-                        config.makerApiAppId, config.makerApiToken
-                    )
-                    "Refresh finished, ${results.first} devices loaded. Warnings: ${results.second}"
-                }
-            }
-
-            command("list") {
-                if (!isAuthorized(message)) return@command
-                val chatId = ChatId.fromId(message.chat.id)
-                try {
-                    val deviceLists = runBlocking {
-                        CommandHandlers.handleListCommand(deviceManager)
-                    }
-                    deviceLists.forEach { (type, table) ->
-                        bot.sendMessage(
-                            chatId = chatId,
-                            text = "*$type*:\n$table",
-                            parseMode = MARKDOWN_V2
-                        )
-                    }
-                }
-                // outer-boundary-process-contract: Telegram dispatcher
-                // boundary (multi-message handler, so it cannot use
-                // replyTo). Silent-failure shape: an escaping exception
-                // dies in the dispatcher and the user gets no reply.
-                // Emitted response: a short generic error; details stay in
-                // the logs. Propagation would break the every-command-
-                // answers contract.
-                catch (e: Exception) {
-                    logger.error("List command failed", e)
-                    bot.sendMessage(
-                        chatId = chatId,
-                        text = "Something went wrong listing devices. Check the bot logs for details."
-                    )
-                }
-            }
-
-            command("get_open_sensors") {
-                if (!isAuthorized(message)) return@command
-                replyTo(bot, message) {
-                    CommandHandlers.handleGetOpenSensorsCommand(
-                        deviceManager, networkClient,
-                        config.makerApiAppId, config.makerApiToken, config.defaultHubIp
-                    )
-                }
-            }
-
-            command("get_mode") {
-                if (!isAuthorized(message)) return@command
-                replyTo(bot, message) {
-                    CommandHandlers.handleGetModeCommand(
-                        networkClient, config.makerApiAppId,
-                        config.makerApiToken, config.defaultHubIp
-                    )
-                }
-            }
-
-            command("list_modes") {
-                if (!isAuthorized(message)) return@command
-                replyTo(bot, message) {
-                    CommandHandlers.handleListModesCommand(
-                        networkClient, config.makerApiAppId,
-                        config.makerApiToken, config.defaultHubIp
-                    )
-                }
-            }
-
-            command("set_mode") {
-                if (!isAuthorized(message)) return@command
-                replyTo(bot, message) {
-                    CommandHandlers.handleSetModeCommand(
-                        message, networkClient, config.makerApiAppId,
-                        config.makerApiToken, config.defaultHubIp
-                    )
-                }
-            }
+            registerDeviceCommands()
+            registerHubCommands()
+            registerInfoCommands()
+            registerModeCommands()
         }
     }
 
+    announceStartup(bot)
+    bot.startPolling()
+}
+
+private fun Dispatcher.registerDeviceCommands() {
+    message(DeviceCommandFilter({ deviceManager })) {
+        if (!isAuthorized(message)) return@message
+        replyTo(bot, message) {
+            CommandHandlers.handleDeviceCommand(
+                message, deviceManager, networkClient,
+                config.makerApiAppId, config.makerApiToken, config.defaultHubIp
+            )
+        }
+    }
+
+    command("get_open_sensors") {
+        if (!isAuthorized(message)) return@command
+        replyTo(bot, message) {
+            CommandHandlers.handleGetOpenSensorsCommand(
+                deviceManager, networkClient,
+                config.makerApiAppId, config.makerApiToken, config.defaultHubIp
+            )
+        }
+    }
+
+    command("cancel_alerts") {
+        if (!isAuthorized(message)) return@command
+        replyTo(bot, message) {
+            CommandHandlers.handleCancelAlertsCommand(
+                networkClient, config.makerApiAppId, config.makerApiToken, config.defaultHubIp
+            )
+        }
+    }
+}
+
+private fun Dispatcher.registerHubCommands() {
+    command("update") {
+        if (!isAuthorized(message)) return@command
+        replyTo(bot, message) {
+            HubOperations.updateHubsWithPolling(
+                hubs,
+                networkClient,
+                config.defaultHubIp,
+                config.makerApiAppId,
+                config.makerApiToken,
+                progressCallback = { progressMessage ->
+                    bot.sendMessage(
+                        chatId = ChatId.fromId(message.chat.id),
+                        text = progressMessage
+                    )
+                }
+            ).fold(
+                onSuccess = { it },
+                onFailure = {
+                    // The per-hub detail already reached the chat via
+                    // progressCallback. The throwable's cause chain can carry
+                    // token-bearing request URLs, so only a redacted message
+                    // reaches the logs - not the throwable itself.
+                    logger.error("Hub update failed: {}", KtorNetworkClient.redactSecrets(it.message))
+                    "Hub update failed. See the progress messages above; details are in the bot logs."
+                }
+            )
+        }
+    }
+
+    command("firmware") {
+        if (!isAuthorized(message)) return@command
+        val chatId = ChatId.fromId(message.chat.id)
+        val messages = runBlocking {
+            try {
+                FirmwareOperations.checkFirmware(hubs, networkClient)
+            } catch (e: CancellationException) {
+                // Cancellation is not a failure - it must propagate.
+                throw e
+            }
+            // outer-boundary-process-contract: Telegram dispatcher boundary
+            // (multi-message handler, so it cannot use replyTo).
+            // Silent-failure shape: an escaping exception dies in the
+            // dispatcher and the user gets no reply. Emitted response: a
+            // short generic error; exception details (which can carry
+            // internal URLs) stay in the logs. Propagation would break the
+            // every-command-answers contract.
+            catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                logger.error(
+                    "Firmware check failed: {}: {}",
+                    e.javaClass.simpleName,
+                    KtorNetworkClient.redactSecrets(e.message)
+                )
+                listOf("Firmware check failed. Check the bot logs for details.")
+            }
+        }
+        messages.forEach { bot.sendMessage(chatId = chatId, text = it) }
+    }
+
+    command("refresh") {
+        if (!isAuthorized(message)) return@command
+        replyTo(bot, message) {
+            val results = CommandHandlers.handleRefreshCommand(
+                deviceManager, networkClient,
+                config.makerApiAppId, config.makerApiToken, config.defaultHubIp
+            )
+            // Re-initialize hubs too, so a hub added/changed since boot is
+            // picked up (and its ip/managementToken refreshed) without a restart.
+            hubs = HubOperations.initializeHubs(
+                deviceManager, networkClient, config.defaultHubIp,
+                config.makerApiAppId, config.makerApiToken
+            )
+            "Refresh finished, ${results.first} devices loaded. Warnings: ${results.second}"
+        }
+    }
+}
+
+private fun Dispatcher.registerInfoCommands() {
+    command("list") {
+        if (!isAuthorized(message)) return@command
+        val chatId = ChatId.fromId(message.chat.id)
+        try {
+            val deviceLists = runBlocking {
+                CommandHandlers.handleListCommand(deviceManager)
+            }
+            deviceLists.forEach { (type, table) ->
+                bot.sendMessage(
+                    chatId = chatId,
+                    text = "*$type*:\n$table",
+                    parseMode = MARKDOWN_V2
+                )
+            }
+        } catch (e: CancellationException) {
+            // Cancellation is not a failure - it must propagate.
+            throw e
+        }
+        // outer-boundary-process-contract: Telegram dispatcher
+        // boundary (multi-message handler, so it cannot use
+        // replyTo). Silent-failure shape: an escaping exception
+        // dies in the dispatcher and the user gets no reply.
+        // Emitted response: a short generic error; details stay in
+        // the logs. Propagation would break the every-command-
+        // answers contract.
+        catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+            logger.error(
+                "List command failed: {}: {}",
+                e.javaClass.simpleName,
+                KtorNetworkClient.redactSecrets(e.message)
+            )
+            bot.sendMessage(
+                chatId = chatId,
+                text = "Something went wrong listing devices. Check the bot logs for details."
+            )
+        }
+    }
+}
+
+private fun Dispatcher.registerModeCommands() {
+    command("get_mode") {
+        if (!isAuthorized(message)) return@command
+        replyTo(bot, message) {
+            CommandHandlers.handleGetModeCommand(
+                networkClient, config.makerApiAppId,
+                config.makerApiToken, config.defaultHubIp
+            )
+        }
+    }
+
+    command("list_modes") {
+        if (!isAuthorized(message)) return@command
+        replyTo(bot, message) {
+            CommandHandlers.handleListModesCommand(
+                networkClient, config.makerApiAppId,
+                config.makerApiToken, config.defaultHubIp
+            )
+        }
+    }
+
+    command("set_mode") {
+        if (!isAuthorized(message)) return@command
+        replyTo(bot, message) {
+            CommandHandlers.handleSetModeCommand(
+                message, networkClient, config.makerApiAppId,
+                config.makerApiToken, config.defaultHubIp
+            )
+        }
+    }
+}
+
+private fun announceStartup(bot: Bot) {
     botUsername = bot.getMe().getOrNull()?.username
     if (botUsername == null) {
         logger.warn(
@@ -242,7 +284,6 @@ fun main() {
             text = startupMessage
         )
     }
-    bot.startPolling()
 }
 
 private suspend fun getDevicesJson(): String =
@@ -260,6 +301,9 @@ private suspend fun getDevicesJson(): String =
 private fun replyTo(bot: Bot, message: Message, block: suspend () -> String) {
     val text = try {
         runBlocking { block() }
+    } catch (e: CancellationException) {
+        // Cancellation is not a failure - it must propagate past the boundary.
+        throw e
     }
     // outer-boundary-process-contract: Telegram dispatcher boundary.
     // Silent-failure shape: an exception escaping a handler dies inside
@@ -268,8 +312,14 @@ private fun replyTo(bot: Bot, message: Message, block: suspend () -> String) {
     // details, which can carry internal URLs, stay in the logs). Letting
     // it propagate would break the contract that every command answers
     // the chat.
-    catch (e: Exception) {
-        logger.error("Handler for '${message.text}' failed", e)
+    catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+        // Redacted message, not the throwable: ktor exception text and cause
+        // chains can carry token-bearing request URLs.
+        logger.error(
+            "Handler for '${message.text}' failed: {}: {}",
+            e.javaClass.simpleName,
+            KtorNetworkClient.redactSecrets(e.message)
+        )
         val command = message.text?.split(" ")?.firstOrNull() ?: "command"
         "Something went wrong handling $command. Check the bot logs for details."
     }

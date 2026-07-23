@@ -114,7 +114,7 @@ class DeviceManagerTest {
         assertTrue(guestBedroomLights.isSuccess)
         assertEquals(9, guestBedroomLights.getOrNull()?.id)
     }
-    
+
     @Test
     fun `test finding devices by type`() {
         val bulbs = deviceManager.findDevicesByType(Device.RoomLightsActivatorBulb::class.java)

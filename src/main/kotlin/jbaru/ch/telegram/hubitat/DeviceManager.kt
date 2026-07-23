@@ -3,6 +3,8 @@ package jbaru.ch.telegram.hubitat
 import jbaru.ch.telegram.hubitat.model.Device
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -41,17 +43,25 @@ class DeviceManager(deviceListJson: String) {
         // newly-installed driver with no @Serializable subclass yet) is skipped
         // with a visible warning instead of aborting the whole list and crashing
         // the bot at boot.
+        // Per-device resilience: a decode failure - unknown type, missing field,
+        // malformed element - skips that device with a warning instead of
+        // taking the whole list (and the bot) down at boot.
         val newDevices = format.parseToJsonElement(deviceListJson).jsonArray.mapNotNull { element ->
-            try {
+            onExpectedFailure(
+                onFailure = { e ->
+                    // The element may not even be a JSON object - the warning
+                    // path must not throw a second time.
+                    val obj = element as? JsonObject
+                    val type = (obj?.get("type") as? JsonPrimitive)?.content ?: "unknown"
+                    val label = (obj?.get("label") as? JsonPrimitive)?.content ?: "unknown"
+                    val message = "WARNING Skipping unsupported device (type='$type', label='$label'): " +
+                        (e.message?.substringBefore('\n') ?: e.toString())
+                    warnings.add(message)
+                    logger.warn(message.removePrefix("WARNING "))
+                    null
+                }
+            ) {
                 format.decodeFromJsonElement<Device>(element)
-            } catch (e: Exception) {
-                val type = element.jsonObject["type"]?.jsonPrimitive?.content ?: "unknown"
-                val label = element.jsonObject["label"]?.jsonPrimitive?.content ?: "unknown"
-                val message = "WARNING Skipping unsupported device (type='$type', label='$label'): " +
-                    (e.message?.substringBefore('\n') ?: e.toString())
-                warnings.add(message)
-                logger.warn(message.removePrefix("WARNING "))
-                null
             }
         }
 

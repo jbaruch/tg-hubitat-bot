@@ -13,20 +13,20 @@ import io.ktor.http.headersOf
 import io.ktor.utils.io.ByteReadChannel
 
 class NetworkClientTest : FunSpec({
-    
+
     context("KtorNetworkClient") {
         test("get should make GET request with parameters") {
             val mockEngine = MockEngine { request ->
                 request.method shouldBe HttpMethod.Get
                 request.url.toString() shouldBe "http://test.com/api?access_token=token123"
-                
+
                 respond(
                     content = ByteReadChannel("""{"status": "success"}"""),
                     status = HttpStatusCode.OK,
                     headers = headersOf("Content-Type" to listOf("application/json"))
                 )
             }
-            
+
             val client = KtorNetworkClient(HttpClient(mockEngine))
             val response = client.get(
                 "http://test.com/api",

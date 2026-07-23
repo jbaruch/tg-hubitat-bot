@@ -23,7 +23,7 @@ import io.kotest.matchers.string.shouldNotContain
  * Tests full flow with real DeviceManager and mocked network.
  */
 class CommandFlowIntegrationTest : FunSpec({
-    
+
     val devicesJson = """
         [
             {"id": 1, "label": "Living Room Light", "type": "Virtual Switch"},
@@ -32,7 +32,7 @@ class CommandFlowIntegrationTest : FunSpec({
             {"id": 4, "label": "Back Door", "type": "Generic Zigbee Contact Sensor"}
         ]
     """.trimIndent()
-    
+
     test("device command flow - successful execution") {
         val mockEngine = MockEngine { request ->
             when {
@@ -59,18 +59,18 @@ class CommandFlowIntegrationTest : FunSpec({
                 }
             }
         }
-        
+
         val client = HttpClient(mockEngine)
         val networkClient = KtorNetworkClient(client)
         val deviceManager = DeviceManager(devicesJson)
-        
+
         val message = Message(
             messageId = 1,
             date = 0,
             chat = Chat(id = 123, type = "private"),
             text = "/on lrl" // Using abbreviation for Living Room Light
         )
-        
+
         val result = CommandHandlers.handleDeviceCommand(
             message = message,
             deviceManager = deviceManager,
@@ -79,10 +79,10 @@ class CommandFlowIntegrationTest : FunSpec({
             makerApiToken = "test-token",
             defaultHubIp = "192.168.1.100"
         )
-        
+
         result shouldBe "Done: Living Room Light → on"
     }
-    
+
     test("device command flow - full multi-word device name") {
         val mockEngine = MockEngine { request ->
             when {
@@ -126,18 +126,18 @@ class CommandFlowIntegrationTest : FunSpec({
                 headers = headersOf(HttpHeaders.ContentType, "application/json")
             )
         }
-        
+
         val client = HttpClient(mockEngine)
         val networkClient = KtorNetworkClient(client)
         val deviceManager = DeviceManager(devicesJson)
-        
+
         val message = Message(
             messageId = 1,
             date = 0,
             chat = Chat(id = 123, type = "private"),
             text = "/on xyz" // Non-existent device abbreviation
         )
-        
+
         val result = CommandHandlers.handleDeviceCommand(
             message = message,
             deviceManager = deviceManager,
@@ -146,21 +146,21 @@ class CommandFlowIntegrationTest : FunSpec({
             makerApiToken = "test-token",
             defaultHubIp = "192.168.1.100"
         )
-        
+
         result.shouldContain("No device found")
     }
-    
+
     test("list command flow - returns formatted device lists") {
         val deviceManager = DeviceManager(devicesJson)
-        
+
         val deviceLists = CommandHandlers.handleListCommand(deviceManager)
-        
+
         deviceLists.isNotEmpty() shouldBe true
         // Check that we have device lists
         deviceLists.values.any { it.contains("Living Room Light") } shouldBe true
         deviceLists.values.any { it.contains("Kitchen Light") } shouldBe true
     }
-    
+
     test("refresh command flow - successful refresh") {
         val mockEngine = MockEngine { request ->
             respond(
@@ -169,11 +169,11 @@ class CommandFlowIntegrationTest : FunSpec({
                 headers = headersOf(HttpHeaders.ContentType, "application/json")
             )
         }
-        
+
         val client = HttpClient(mockEngine)
         val networkClient = KtorNetworkClient(client)
         val deviceManager = DeviceManager(devicesJson)
-        
+
         val (count, warnings) = CommandHandlers.handleRefreshCommand(
             deviceManager = deviceManager,
             networkClient = networkClient,
@@ -181,11 +181,11 @@ class CommandFlowIntegrationTest : FunSpec({
             makerApiToken = "test-token",
             defaultHubIp = "192.168.1.100"
         )
-        
+
         count shouldBe 4
         warnings.isEmpty() shouldBe true
     }
-    
+
     test("cancel alerts command flow - successful cancellation") {
         val mockEngine = MockEngine { request ->
             when {
@@ -203,20 +203,20 @@ class CommandFlowIntegrationTest : FunSpec({
                 }
             }
         }
-        
+
         val client = HttpClient(mockEngine)
         val networkClient = KtorNetworkClient(client)
-        
+
         val result = CommandHandlers.handleCancelAlertsCommand(
             networkClient = networkClient,
             makerApiAppId = "test-app",
             makerApiToken = "test-token",
             defaultHubIp = "192.168.1.100"
         )
-        
+
         result shouldBe "HSM alerts cancelled."
     }
-    
+
     test("get open sensors command flow - with open sensors") {
         val mockEngine = MockEngine { request ->
             when {
@@ -242,11 +242,11 @@ class CommandFlowIntegrationTest : FunSpec({
                 }
             }
         }
-        
+
         val client = HttpClient(mockEngine)
         val networkClient = KtorNetworkClient(client)
         val deviceManager = DeviceManager(devicesJson)
-        
+
         val result = CommandHandlers.handleGetOpenSensorsCommand(
             deviceManager = deviceManager,
             networkClient = networkClient,
@@ -254,11 +254,11 @@ class CommandFlowIntegrationTest : FunSpec({
             makerApiToken = "test-token",
             defaultHubIp = "192.168.1.100"
         )
-        
+
         result.shouldContain("Front Door")
         result.shouldNotContain("Back Door")
     }
-    
+
     test("get open sensors command flow - no open sensors") {
         val mockEngine = MockEngine { request ->
             respond(
@@ -267,11 +267,11 @@ class CommandFlowIntegrationTest : FunSpec({
                 headers = headersOf(HttpHeaders.ContentType, "application/json")
             )
         }
-        
+
         val client = HttpClient(mockEngine)
         val networkClient = KtorNetworkClient(client)
         val deviceManager = DeviceManager(devicesJson)
-        
+
         val result = CommandHandlers.handleGetOpenSensorsCommand(
             deviceManager = deviceManager,
             networkClient = networkClient,
@@ -279,7 +279,7 @@ class CommandFlowIntegrationTest : FunSpec({
             makerApiToken = "test-token",
             defaultHubIp = "192.168.1.100"
         )
-        
+
         result shouldBe "No open sensors found."
     }
 })

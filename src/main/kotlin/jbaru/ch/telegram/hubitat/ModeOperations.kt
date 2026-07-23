@@ -13,25 +13,27 @@ data class ModeInfo(
 
 object ModeOperations {
     private val json = Json { ignoreUnknownKeys = true }
-    
+
     suspend fun getAllModes(
         networkClient: NetworkClient,
         makerApiAppId: String,
         makerApiToken: String,
         hubIp: String
     ): Result<List<ModeInfo>> {
-        return try {
+        return onExpectedFailureSuspend(
+            // Handlers print the failure message into chat; network exception
+            // text can carry the request URL with access_token - redact.
+            onFailure = { Result.failure(IllegalStateException(KtorNetworkClient.redactSecrets(it.message), it)) }
+        ) {
             val modesJson = networkClient.getBody(
                 "http://${hubIp}/apps/api/${makerApiAppId}/modes",
                 mapOf("access_token" to makerApiToken)
             )
             val modes = json.decodeFromString<List<ModeInfo>>(modesJson)
             Result.success(modes)
-        } catch (e: Exception) {
-            Result.failure(e)
         }
     }
-    
+
     suspend fun getCurrentMode(
         networkClient: NetworkClient,
         makerApiAppId: String,
@@ -44,7 +46,7 @@ object ModeOperations {
                     ?: throw IllegalStateException("No active mode found")
             }
     }
-    
+
     suspend fun setMode(
         networkClient: NetworkClient,
         makerApiAppId: String,
@@ -52,33 +54,32 @@ object ModeOperations {
         hubIp: String,
         modeName: String
     ): Result<String> {
-        return try {
-            // First get all modes to find the ID
+        return onExpectedFailureSuspend(
+            // Handlers print the failure message into chat; network exception
+            // text can carry the request URL with access_token - redact.
+            onFailure = { Result.failure(IllegalStateException(KtorNetworkClient.redactSecrets(it.message), it)) }
+        ) {
+            // First get all modes to find the ID (Maker API uses GET for all commands)
             val modesResult = getAllModes(networkClient, makerApiAppId, makerApiToken, hubIp)
-            if (modesResult.isFailure) {
-                return Result.failure(modesResult.exceptionOrNull()!!)
+            val modeId = modesResult.getOrNull()?.let { findModeIdByName(it, modeName) }
+            when {
+                modesResult.isFailure -> Result.failure(modesResult.exceptionOrNull()!!)
+                modeId == null -> Result.failure(IllegalArgumentException("Mode not found: $modeName"))
+                else -> {
+                    val response = networkClient.get(
+                        "http://${hubIp}/apps/api/${makerApiAppId}/modes/${modeId}",
+                        mapOf("access_token" to makerApiToken)
+                    )
+                    if (response.status.isSuccess()) {
+                        Result.success("Mode changed to $modeName")
+                    } else {
+                        Result.failure(IllegalStateException("Failed to set mode: ${response.status}"))
+                    }
+                }
             }
-            
-            val modes = modesResult.getOrNull()!!
-            val modeId = findModeIdByName(modes, modeName)
-                ?: return Result.failure(IllegalArgumentException("Mode not found: $modeName"))
-            
-            // Call GET endpoint with the mode ID (Maker API uses GET for all commands)
-            val response = networkClient.get(
-                "http://${hubIp}/apps/api/${makerApiAppId}/modes/${modeId}",
-                mapOf("access_token" to makerApiToken)
-            )
-            
-            if (response.status.isSuccess()) {
-                Result.success("Mode changed to $modeName")
-            } else {
-                Result.failure(Exception("Failed to set mode: ${response.status}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
         }
     }
-    
+
     private fun findModeIdByName(
         modes: List<ModeInfo>,
         modeName: String

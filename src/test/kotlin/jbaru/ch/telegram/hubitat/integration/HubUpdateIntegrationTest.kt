@@ -19,7 +19,7 @@ import jbaru.ch.telegram.hubitat.model.Device
  * Tests the full update flow with mocked network responses.
  */
 class HubUpdateIntegrationTest : FunSpec({
-    
+
     test("full hub update flow with successful polling") {
         var callCount = 0
         val mockEngine = MockEngine { request ->
@@ -52,19 +52,19 @@ class HubUpdateIntegrationTest : FunSpec({
                 }
             }
         }
-        
+
         val client = HttpClient(mockEngine)
         val networkClient = KtorNetworkClient(client)
-        
+
         val hub = Device.Hub(
             id = 1,
             label = "Test Hub",
             ip = "192.168.1.100",
             managementToken = "test-token"
         )
-        
+
         val progressMessages = mutableListOf<String>()
-        
+
         val result = HubOperations.updateHubsWithPolling(
             hubs = listOf(hub),
             networkClient = networkClient,
@@ -77,12 +77,12 @@ class HubUpdateIntegrationTest : FunSpec({
                 progressMessages.add(message)
             }
         )
-        
+
         // The test should complete without throwing exceptions
         // Result may be success or failure depending on mock behavior
         result.isSuccess || result.isFailure shouldBe true
     }
-    
+
     test("hub update flow with already up-to-date hubs") {
         val mockEngine = MockEngine { request ->
             when {
@@ -105,19 +105,19 @@ class HubUpdateIntegrationTest : FunSpec({
                 }
             }
         }
-        
+
         val client = HttpClient(mockEngine)
         val networkClient = KtorNetworkClient(client)
-        
+
         val hub = Device.Hub(
             id = 1,
             label = "Test Hub",
             ip = "192.168.1.100",
             managementToken = "test-token"
         )
-        
+
         val progressMessages = mutableListOf<String>()
-        
+
         val result = HubOperations.updateHubsWithPolling(
             hubs = listOf(hub),
             networkClient = networkClient,
@@ -130,11 +130,11 @@ class HubUpdateIntegrationTest : FunSpec({
                 progressMessages.add(message)
             }
         )
-        
+
         result.isSuccess shouldBe true
         result.getOrNull() shouldContain "All hubs are already up to date"
     }
-    
+
     test("hub update flow with network errors") {
         val mockEngine = MockEngine { request ->
             respond(
@@ -142,17 +142,17 @@ class HubUpdateIntegrationTest : FunSpec({
                 status = HttpStatusCode.InternalServerError
             )
         }
-        
+
         val client = HttpClient(mockEngine)
         val networkClient = KtorNetworkClient(client)
-        
+
         val hub = Device.Hub(
             id = 1,
             label = "Test Hub",
             ip = "192.168.1.100",
             managementToken = "test-token"
         )
-        
+
         val result = HubOperations.updateHubsWithPolling(
             hubs = listOf(hub),
             networkClient = networkClient,
@@ -163,7 +163,7 @@ class HubUpdateIntegrationTest : FunSpec({
             delayMillis = 100,
             progressCallback = { }
         )
-        
+
         result.isFailure shouldBe true
     }
 })

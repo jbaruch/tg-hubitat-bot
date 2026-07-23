@@ -32,6 +32,10 @@ class DeviceManager(deviceListJson: String) {
         refreshDevices(deviceListJson)
     }
 
+    // Per-device resilience: any decode failure - unknown type, missing field,
+    // serializer quirk - skips that device with a warning instead of taking
+    // the whole list (and the bot) down at boot.
+    @Suppress("TooGenericExceptionCaught")
     @Synchronized
     fun refreshDevices(deviceListJson: String): Pair<Int, List<String>> {
         val format = Json { ignoreUnknownKeys = true }

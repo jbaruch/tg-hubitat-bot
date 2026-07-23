@@ -15,6 +15,7 @@ import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import io.ktor.http.HttpStatusCode
+import java.util.concurrent.CancellationException
 import jbaru.ch.telegram.hubitat.model.Device
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -147,6 +148,9 @@ private fun Dispatcher.registerHubCommands() {
             @Suppress("TooGenericExceptionCaught")
             try {
                 FirmwareOperations.checkFirmware(hubs, networkClient)
+            } catch (e: CancellationException) {
+                // Cancellation is not a failure - it must propagate.
+                throw e
             }
             // outer-boundary-process-contract: Telegram dispatcher boundary
             // (multi-message handler, so it cannot use replyTo).
@@ -197,6 +201,9 @@ private fun Dispatcher.registerInfoCommands() {
                     parseMode = MARKDOWN_V2
                 )
             }
+        } catch (e: CancellationException) {
+            // Cancellation is not a failure - it must propagate.
+            throw e
         }
         // outer-boundary-process-contract: Telegram dispatcher
         // boundary (multi-message handler, so it cannot use
@@ -287,6 +294,9 @@ private suspend fun getDevicesJson(): String =
 private fun replyTo(bot: Bot, message: Message, block: suspend () -> String) {
     val text = @Suppress("TooGenericExceptionCaught") try {
         runBlocking { block() }
+    } catch (e: CancellationException) {
+        // Cancellation is not a failure - it must propagate past the boundary.
+        throw e
     }
     // outer-boundary-process-contract: Telegram dispatcher boundary.
     // Silent-failure shape: an exception escaping a handler dies inside

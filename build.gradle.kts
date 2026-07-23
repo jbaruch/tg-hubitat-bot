@@ -20,6 +20,8 @@ plugins {
     id("com.google.cloud.tools.jib") version "3.5.1"
     application
     jacoco
+    // Renewal: the `gradle` ecosystem entry in .github/dependabot.yml
+    // (patterns: ["*"]) tracks this and every other Gradle plugin/dependency pin.
     id("dev.detekt") version "2.0.0-alpha.5"
 }
 

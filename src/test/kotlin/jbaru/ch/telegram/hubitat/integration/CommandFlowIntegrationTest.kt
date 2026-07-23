@@ -17,7 +17,6 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
-import org.mockito.kotlin.mock
 
 /**
  * Integration test for command flow from message to response.
@@ -65,7 +64,6 @@ class CommandFlowIntegrationTest : FunSpec({
         val networkClient = KtorNetworkClient(client)
         val deviceManager = DeviceManager(devicesJson)
         
-        val bot = mock<com.github.kotlintelegrambot.Bot>()
         val message = Message(
             messageId = 1,
             date = 0,
@@ -101,7 +99,6 @@ class CommandFlowIntegrationTest : FunSpec({
         val networkClient = KtorNetworkClient(client)
         val deviceManager = DeviceManager(devicesJson)
 
-        val bot = mock<com.github.kotlintelegrambot.Bot>()
         val message = Message(
             messageId = 1,
             date = 0,
@@ -134,7 +131,6 @@ class CommandFlowIntegrationTest : FunSpec({
         val networkClient = KtorNetworkClient(client)
         val deviceManager = DeviceManager(devicesJson)
         
-        val bot = mock<com.github.kotlintelegrambot.Bot>()
         val message = Message(
             messageId = 1,
             date = 0,

@@ -176,10 +176,10 @@ class DeviceManager(deviceListJson: String) {
 
                 deviceToAliases.forEach { (device, aliases) ->
                     val aliasesString = aliases.joinToString(", ")
-                        appendLine(
-                        "| ${escapeMarkdownCode(device.label).padEnd(maxDeviceNameLength)} | " +
-                            "${aliasesString.padEnd(maxAliasesLength)} |"
-                    )
+                    appendLine(
+                    "| ${escapeMarkdownCode(device.label).padEnd(maxDeviceNameLength)} | " +
+                        "${aliasesString.padEnd(maxAliasesLength)} |"
+                )
                 }
 
                 appendLine(tableBorder(maxDeviceNameLength, maxAliasesLength))

@@ -1,6 +1,5 @@
 package jbaru.ch.telegram.hubitat
 
-import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.Message
 import io.ktor.http.isSuccess

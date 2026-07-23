@@ -6,7 +6,6 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.any
 import org.mockito.kotlin.whenever
 
-import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.entities.Message
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
@@ -17,7 +16,6 @@ import jbaru.ch.telegram.hubitat.model.Device
 
 class CommandHandlersTest : FunSpec({
     
-    lateinit var bot: Bot
     lateinit var deviceManager: DeviceManager
     lateinit var networkClient: NetworkClient
     val makerApiAppId = "test-app-id"
@@ -25,7 +23,6 @@ class CommandHandlersTest : FunSpec({
     val defaultHubIp = "hubitat.local"
     
     beforeEach {
-        bot = mock()
         deviceManager = mock()
         networkClient = mock()
     }

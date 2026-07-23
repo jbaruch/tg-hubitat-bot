@@ -20,7 +20,9 @@ data class BotConfiguration(
 
     companion object {
         private fun requiredEnv(name: String): String =
-            getenv(name) ?: throw IllegalStateException("$name not set")
+            getenv(name) ?: throw IllegalStateException(
+                "$name not set - set the $name environment variable before starting the bot"
+            )
 
         fun fromEnvironment(): BotConfiguration {
             // Trimmed so the stored value matches what the allowlist validated -

@@ -13,12 +13,16 @@ import io.kotest.property.checkAll
 // self-generated randomness in CI, no jacoco coverage-gate flakiness.
 private const val FIXED_SEED = 20260722L
 
+// Bounded iterations: the default 1000 made mockito's per-mock invocation
+// recording balloon to hundreds of MB across a checkAll run.
+private const val PROP_ITERATIONS = 100
+
 class StringUtilsPropertyTest : FunSpec({
     
     // **Feature: test-coverage-improvement, Property 5: Snake case to camel case conversion**
     test("snakeToCamelCase capitalizes each word after the first and removes underscores")
         .config(invocations = 100) {
-        checkAll(PropTestConfig(seed = FIXED_SEED), Arb.string(1..50)) { input ->
+        checkAll(PropTestConfig(seed = FIXED_SEED, iterations = PROP_ITERATIONS), Arb.string(1..50)) { input ->
             val snakeCase = input.replace(" ", "_").lowercase()
             val result = snakeCase.snakeToCamelCase()
             

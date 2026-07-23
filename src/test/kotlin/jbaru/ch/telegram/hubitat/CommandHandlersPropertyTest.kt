@@ -22,6 +22,10 @@ import jbaru.ch.telegram.hubitat.model.Device
 // self-generated randomness in CI, no jacoco coverage-gate flakiness.
 private const val FIXED_SEED = 20260722L
 
+// Bounded iterations: the default 1000 made mockito's per-mock invocation
+// recording balloon to hundreds of MB across a checkAll run.
+private const val PROP_ITERATIONS = 100
+
 class CommandHandlersPropertyTest : FunSpec({
     
     // **Feature: test-coverage-improvement, Property 1: Command parsing correctness**
@@ -29,7 +33,7 @@ class CommandHandlersPropertyTest : FunSpec({
         val deviceManager = mock<DeviceManager>()
         val networkClient = mock<NetworkClient>()
         
-        checkAll(PropTestConfig(seed = FIXED_SEED), Arb.string(1..50)) { input ->
+        checkAll(PropTestConfig(seed = FIXED_SEED, iterations = PROP_ITERATIONS), Arb.string(1..50)) { input ->
             val parts = input.split(" ").filter { it.isNotEmpty() }
             if (parts.size >= 2) {
                 val command = parts[0].filter { it.isLetterOrDigit() || it == '_' }

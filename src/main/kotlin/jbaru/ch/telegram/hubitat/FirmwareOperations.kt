@@ -64,6 +64,7 @@ object FirmwareOperations {
     internal const val CATALOG_URL =
         "https://raw.githubusercontent.com/jbaruch/tg-hubitat-bot/main/src/main/resources/zwave-firmware-catalog.json"
     private const val MAX_MESSAGE_LENGTH = 3900
+    private const val ZWAVE_NODE_ID_RADIX = 16
 
     fun loadCatalog(): FirmwareCatalog {
         val resource = FirmwareOperations::class.java.getResourceAsStream(CATALOG_RESOURCE)
@@ -77,6 +78,9 @@ object FirmwareOperations {
      * bot redeploy. The bundled copy is the offline fallback, and the report
      * header says so when it is used.
      */
+    // Any failure here - network, HTTP, malformed JSON - must fall back to the
+    // bundled catalog rather than kill /firmware; the note in the report says so.
+    @Suppress("TooGenericExceptionCaught")
     suspend fun fetchCatalog(networkClient: NetworkClient): Pair<FirmwareCatalog, String?> =
         try {
             json.decodeFromString<FirmwareCatalog>(networkClient.getBody(CATALOG_URL)) to null
@@ -85,6 +89,9 @@ object FirmwareOperations {
             loadCatalog() to "bundled fallback — live catalog unreachable"
         }
 
+    // Per-hub resilience: one unreachable hub becomes a report line, not a
+    // dead /firmware command - whatever it threw.
+    @Suppress("TooGenericExceptionCaught")
     suspend fun checkFirmware(
         hubs: List<Device.Hub>,
         networkClient: NetworkClient
@@ -188,22 +195,27 @@ object FirmwareOperations {
         )
 
         if (info.firmwareVersion == null) {
-            val nodeId = base.dni.toIntOrNull(16)
-                ?: throw IllegalStateException(
-                    "driver reports no firmware version and DNI '${base.dni}' is not a Z-Wave node id"
-                )
-            val details = Json.parseToJsonElement(
-                networkClient.getBody("http://${hub.ip}/hub/zwave/deviceFirmware/details?nodeId=$nodeId")
-            ).jsonObject
-            if (details["success"]?.jsonPrimitive?.booleanOrNull != true) {
-                throw IllegalStateException("deviceFirmware/details failed for node $nodeId")
-            }
-            val version = details["targets"]?.jsonArray?.firstOrNull()
-                ?.jsonObject?.get("version")?.jsonPrimitive?.content
-                ?: throw IllegalStateException("deviceFirmware/details returned no targets for node $nodeId")
-            info = info.copy(firmwareVersion = version)
+            info = info.copy(firmwareVersion = fetchZwaveJsVersion(zwaveJsNodeId(base), hub, networkClient))
         }
         return info
+    }
+
+    private fun zwaveJsNodeId(base: ZwaveDeviceInfo): Int =
+        base.dni.toIntOrNull(ZWAVE_NODE_ID_RADIX)
+            ?: throw IllegalStateException(
+                "driver reports no firmware version and DNI '${base.dni}' is not a Z-Wave node id"
+            )
+
+    private suspend fun fetchZwaveJsVersion(nodeId: Int, hub: Device.Hub, networkClient: NetworkClient): String {
+        val details = Json.parseToJsonElement(
+            networkClient.getBody("http://${hub.ip}/hub/zwave/deviceFirmware/details?nodeId=$nodeId")
+        ).jsonObject
+        if (details["success"]?.jsonPrimitive?.booleanOrNull != true) {
+            throw IllegalStateException("deviceFirmware/details failed for node $nodeId")
+        }
+        return details["targets"]?.jsonArray?.firstOrNull()
+            ?.jsonObject?.get("version")?.jsonPrimitive?.content
+            ?: throw IllegalStateException("deviceFirmware/details returned no targets for node $nodeId")
     }
 
     fun classify(device: ZwaveDeviceInfo, catalog: FirmwareCatalog): FirmwareFinding {

@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.delay
+import org.slf4j.LoggerFactory
 
 data class HubVersionInfo(
     val hubLabel: String,
@@ -32,7 +33,9 @@ data class UpdateProgress(
 }
 
 object HubOperations {
-    
+
+    private val logger = LoggerFactory.getLogger(HubOperations::class.java)
+
     suspend fun initializeHubs(
         deviceManager: DeviceManager,
         networkClient: NetworkClient,
@@ -60,7 +63,7 @@ object HubOperations {
                     ?.jsonObject?.get("currentValue")?.jsonPrimitive?.content
 
                 if (ip.isNullOrBlank()) {
-                    println("WARNING Skipping hub '${hub.label}' (id=${hub.id}): no localIP attribute exposed via Maker API")
+                    logger.warn("Skipping hub '${hub.label}' (id=${hub.id}): no localIP attribute exposed via Maker API")
                     continue
                 }
 
@@ -68,7 +71,7 @@ object HubOperations {
                 hub.managementToken = networkClient.getBody("http://${ip}/hub/advanced/getManagementToken")
                 initialized.add(hub)
             } catch (e: Exception) {
-                println("WARNING Skipping hub '${hub.label}' (id=${hub.id}): ${e.message?.substringBefore('\n') ?: e}")
+                logger.warn("Skipping hub '${hub.label}' (id=${hub.id}): ${KtorNetworkClient.redactSecrets(e.message?.substringBefore('\n'))}")
             }
         }
         return initialized

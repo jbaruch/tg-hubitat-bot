@@ -5,6 +5,14 @@ import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.Message
 import io.ktor.http.isSuccess
 import jbaru.ch.telegram.hubitat.model.Device
+import java.io.IOException
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -13,6 +21,7 @@ import org.slf4j.LoggerFactory
 object CommandHandlers {
 
     private val logger = LoggerFactory.getLogger(CommandHandlers::class.java)
+    private const val MAX_MESSAGE_LENGTH = 3900
 
     suspend fun handleDeviceCommand(
         bot: Bot,
@@ -119,22 +128,56 @@ object CommandHandlers {
         makerApiAppId: String,
         makerApiToken: String,
         defaultHubIp: String
-    ): String {
-        val openSensors = deviceManager.findDevicesByType(Device.ContactSensor::class.java)
-            .mapNotNull { sensor ->
-                val currentValue = getDeviceAttribute(sensor, "contact", networkClient, makerApiAppId, makerApiToken, defaultHubIp)
-                if (currentValue == "open") {
-                    sensor.label
-                } else {
-                    null
+    ): String = coroutineScope {
+        // One HTTP call per sensor: run them concurrently (capped so a large
+        // fleet doesn't stampede the hub), and never let one unreachable
+        // sensor take down the whole report - it is listed as unreadable
+        // instead.
+        val semaphore = Semaphore(8)
+        val states = deviceManager.findDevicesByType(Device.ContactSensor::class.java)
+            .map { sensor ->
+                async {
+                    semaphore.withPermit {
+                        try {
+                            sensor to getDeviceAttribute(
+                                sensor, "contact", networkClient, makerApiAppId, makerApiToken, defaultHubIp
+                            )
+                        } catch (e: CancellationException) {
+                            // Never swallow structured-concurrency cancellation.
+                            throw e
+                        }
+                        // The expected per-sensor failures - network (timeouts
+                        // included: ktor's HttpRequestTimeoutException is an
+                        // IOException), a non-2xx from getBody, and malformed
+                        // JSON - mark the sensor "Could not read" instead of
+                        // aborting the whole report.
+                        catch (e: IOException) {
+                            logUnreadableSensor(sensor.label, e); sensor to null
+                        } catch (e: IllegalStateException) {
+                            logUnreadableSensor(sensor.label, e); sensor to null
+                        } catch (e: SerializationException) {
+                            logUnreadableSensor(sensor.label, e); sensor to null
+                        } catch (e: IllegalArgumentException) {
+                            logUnreadableSensor(sensor.label, e); sensor to null
+                        }
+                    }
                 }
-            }.joinToString(separator = "\n")
+            }.awaitAll()
 
-        return if (openSensors.isNotEmpty()) {
-            "Open Sensors:\n$openSensors"
-        } else {
-            "No open sensors found."
+        val openSensors = states.filter { it.second == "open" }.joinToString("\n") { it.first.label }
+        val unreadable = states.filter { it.second == null }.joinToString(", ") { it.first.label }
+
+        val reply = buildString {
+            append(
+                if (openSensors.isNotEmpty()) "Open Sensors:\n$openSensors" else "No open sensors found."
+            )
+            if (unreadable.isNotEmpty()) {
+                append("\nCould not read: $unreadable")
+            }
         }
+        // Telegram caps messages at 4096 chars; a large install can exceed it.
+        if (reply.length <= MAX_MESSAGE_LENGTH) reply
+        else reply.take(MAX_MESSAGE_LENGTH) + "\n… (truncated)"
     }
     
     suspend fun handleGetModeCommand(
@@ -207,6 +250,10 @@ object CommandHandlers {
         )
     }
     
+    private fun logUnreadableSensor(label: String, e: Exception) {
+        logger.warn("Could not read contact state of '{}': {}", label, KtorNetworkClient.redactSecrets(e.message))
+    }
+
     private suspend fun runDeviceCommand(
         device: Device,
         command: String,

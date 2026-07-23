@@ -57,6 +57,13 @@ class KtorNetworkClient(private val client: HttpClient) : NetworkClient {
         // Query params whose values are credentials and must never hit the logs.
         private val SENSITIVE_KEYS = setOf("access_token", "token")
 
+        // Network-layer exception messages can embed the full request URL,
+        // query string included - scrub credentials before such text reaches
+        // a log line or a chat reply.
+        private val SECRET_PARAM_REGEX = Regex("""(access_token|token)=[^&\s"]+""")
+        internal fun redactSecrets(text: String?): String =
+            text?.replace(SECRET_PARAM_REGEX, "$1=[REDACTED]") ?: "unknown error"
+
         internal fun redact(params: Map<String, String>): Map<String, String> =
             params.mapValues { (key, value) -> if (key in SENSITIVE_KEYS) "[REDACTED]" else value }
 

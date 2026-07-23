@@ -447,6 +447,44 @@ class CommandHandlersTest : FunSpec({
             result shouldBe "No open sensors found."
         }
 
+        test("should keep reporting when one sensor read fails") {
+            val sensor1 = Device.GenericZigbeeContactSensor(1, "Front Door")
+            val sensor2 = Device.GenericZigbeeContactSensor(2, "Back Door")
+            whenever(deviceManager.findDevicesByType(Device.ContactSensor::class.java))
+                .thenReturn(listOf(sensor1, sensor2))
+
+            whenever(networkClient.getBody(argThat { contains("/devices/1/attribute/contact") }, any()))
+                .thenReturn("""{"value": "open"}""")
+            whenever(networkClient.getBody(argThat { contains("/devices/2/attribute/contact") }, any()))
+                .thenThrow(IllegalStateException("Hub request failed: HTTP 503"))
+
+            val result = CommandHandlers.handleGetOpenSensorsCommand(
+                deviceManager, networkClient,
+                makerApiAppId, makerApiToken, defaultHubIp
+            )
+
+            result shouldContain "Front Door"
+            result shouldContain "Could not read: Back Door"
+        }
+
+        test("should truncate an oversized reply under the Telegram limit") {
+            val sensors = (1..200).map {
+                Device.GenericZigbeeContactSensor(it, "Sensor With A Fairly Long Name Number $it")
+            }
+            whenever(deviceManager.findDevicesByType(Device.ContactSensor::class.java))
+                .thenReturn(sensors)
+            whenever(networkClient.getBody(any(), any()))
+                .thenReturn("""{"value": "open"}""")
+
+            val result = CommandHandlers.handleGetOpenSensorsCommand(
+                deviceManager, networkClient,
+                makerApiAppId, makerApiToken, defaultHubIp
+            )
+
+            (result.length <= 4000) shouldBe true
+            result shouldContain "truncated"
+        }
+
         test("should treat a sensor with no value attribute as not open") {
             // Covers the '?: \"Unknown\"' fallback in getDeviceAttribute.
             val sensor = Device.GenericZigbeeContactSensor(1, "Front Door")

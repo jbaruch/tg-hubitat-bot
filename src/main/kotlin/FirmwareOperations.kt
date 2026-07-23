@@ -6,6 +6,14 @@ import jbaru.ch.telegram.hubitat.model.FirmwareCatalog
 import jbaru.ch.telegram.hubitat.model.FirmwareLine
 import jbaru.ch.telegram.hubitat.model.firmwareMajor
 import jbaru.ch.telegram.hubitat.model.parseFirmwareVersion
+import java.io.IOException
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -110,22 +118,52 @@ object FirmwareOperations {
             .mapNotNull { it.jsonObject["data"] as? JsonObject }
             .filter { it["isZwave"]?.jsonPrimitive?.booleanOrNull == true }
 
-        return zwaveEntries.map { data ->
-            val id = data["id"]!!.jsonPrimitive.content.toInt()
-            val base = ZwaveDeviceInfo(
-                hubLabel = hub.label,
-                deviceId = id,
-                dni = data["dni"]?.jsonPrimitive?.content ?: "",
-                name = data["name"]?.jsonPrimitive?.content ?: "device $id",
-                driverType = data["type"]?.jsonPrimitive?.content ?: ""
-            )
-            try {
-                readDeviceFirmware(base, hub, networkClient)
-            } catch (e: Exception) {
-                logger.warn("Failed to read firmware info for '{}' on {}: {}", base.name, hub.label, e.message)
-                base.copy(readError = e.message ?: e.toString())
-            }
+        // Two HTTP calls per device add up on a large mesh - fetch concurrently,
+        // capped so the hub isn't stampeded.
+        val semaphore = Semaphore(8)
+        return coroutineScope {
+            zwaveEntries.map { data ->
+                async {
+                    val id = data["id"]!!.jsonPrimitive.content.toInt()
+                    val base = ZwaveDeviceInfo(
+                        hubLabel = hub.label,
+                        deviceId = id,
+                        dni = data["dni"]?.jsonPrimitive?.content ?: "",
+                        name = data["name"]?.jsonPrimitive?.content ?: "device $id",
+                        driverType = data["type"]?.jsonPrimitive?.content ?: ""
+                    )
+                    semaphore.withPermit {
+                        try {
+                            readDeviceFirmware(base, hub, networkClient)
+                        } catch (e: CancellationException) {
+                            // Never swallow structured-concurrency cancellation.
+                            throw e
+                        }
+                        // The expected per-device failures - network (timeouts
+                        // included: ktor's HttpRequestTimeoutException is an
+                        // IOException), the explicit IllegalStateExceptions from
+                        // readDeviceFirmware's error paths, and malformed JSON -
+                        // mark the device unreadable instead of aborting the
+                        // whole report.
+                        catch (e: IOException) {
+                            unreadable(base, hub, e)
+                        } catch (e: IllegalStateException) {
+                            unreadable(base, hub, e)
+                        } catch (e: SerializationException) {
+                            unreadable(base, hub, e)
+                        } catch (e: IllegalArgumentException) {
+                            unreadable(base, hub, e)
+                        }
+                    }
+                }
+            }.awaitAll()
         }
+    }
+
+    private fun unreadable(base: ZwaveDeviceInfo, hub: Device.Hub, e: Exception): ZwaveDeviceInfo {
+        val reason = KtorNetworkClient.redactSecrets(e.message ?: e.toString())
+        logger.warn("Failed to read firmware info for '{}' on {}: {}", base.name, hub.label, reason)
+        return base.copy(readError = reason)
     }
 
     private suspend fun readDeviceFirmware(

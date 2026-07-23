@@ -81,6 +81,14 @@ class NetworkClientTest : FunSpec({
             KtorNetworkClient.redact(params) shouldBe params
         }
 
+        test("redactSecrets scrubs credential query params from exception text") {
+            val msg = "Request timeout has expired [url=http://hub/apps/api/398/devices?access_token=abc123&x=1]"
+            val redacted = KtorNetworkClient.redactSecrets(msg)
+            (redacted.contains("abc123")) shouldBe false
+            redacted shouldBe "Request timeout has expired [url=http://hub/apps/api/398/devices?access_token=[REDACTED]&x=1]"
+            KtorNetworkClient.redactSecrets(null) shouldBe "unknown error"
+        }
+
         test("isSecretResponse flags the management-token endpoint") {
             KtorNetworkClient.isSecretResponse("http://192.168.30.15/hub/advanced/getManagementToken") shouldBe true
             KtorNetworkClient.isSecretResponse("http://192.168.30.15/apps/api/398/devices") shouldBe false

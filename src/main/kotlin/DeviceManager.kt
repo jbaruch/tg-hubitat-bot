@@ -6,8 +6,11 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.slf4j.LoggerFactory
 
 class DeviceManager(deviceListJson: String) {
+
+    private val logger = LoggerFactory.getLogger(DeviceManager::class.java)
 
     // One snapshot behind a single volatile reference: telegram-bot dispatch
     // is multi-threaded, so a /refresh racing a concurrently handled command
@@ -47,7 +50,7 @@ class DeviceManager(deviceListJson: String) {
                 val message = "WARNING Skipping unsupported device (type='$type', label='$label'): " +
                     (e.message?.substringBefore('\n') ?: e.toString())
                 warnings.add(message)
-                println(message)
+                logger.warn(message.removePrefix("WARNING "))
                 null
             }
         }
@@ -208,7 +211,7 @@ class DeviceManager(deviceListJson: String) {
             } else {
                 val message = "WARNING Device name was not abbreviated: $fullName"
                 warnings.add(message)
-                println(message)
+                logger.warn(message.removePrefix("WARNING "))
             }
         }
         return warnings
@@ -219,7 +222,7 @@ class DeviceManager(deviceListJson: String) {
         if (cache.containsKey(key)) {
             val message = "WARNING Duplicate key found in cache: $key"
             warnings.add(message)
-            println(message)
+            logger.warn(message.removePrefix("WARNING "))
         }
         cache[key] = device
         return warnings

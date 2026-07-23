@@ -139,8 +139,12 @@ class DeviceAbbreviatorTest {
             assertEquals("abx", abbr.getAbbreviation("a bx").getOrThrow())
             assertEquals("aby", abbr.getAbbreviation("a by").getOrThrow())
             assertEquals("az", abbr.getAbbreviation("az").getOrThrow())
-            assertTrue(abbr.getAbbreviation("a b").isFailure)
-            assertTrue(abbr.getAbbreviation("ab").isFailure)
+            // The dropped names fail with the dedicated cannot-be-abbreviated
+            // reason, not the generic "was not added".
+            val dropped = abbr.getAbbreviation("a b")
+            assertTrue(dropped.isFailure)
+            assertTrue(dropped.exceptionOrNull()!!.message!!.contains("cannot be abbreviated"))
+            assertTrue(abbr.getAbbreviation("ab").exceptionOrNull()!!.message!!.contains("cannot be abbreviated"))
         }
 
         @Test

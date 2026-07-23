@@ -4,6 +4,7 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import java.io.IOException
+import java.util.concurrent.CancellationException
 import kotlinx.serialization.SerializationException
 
 class ResilienceTest : FunSpec({
@@ -21,6 +22,15 @@ class ResilienceTest : FunSpec({
         )
         for (e in expected) {
             onExpectedFailure(onFailure = { it.message }) { throw e } shouldBe e.message
+        }
+    }
+
+    test("lets CancellationException propagate despite subclassing IllegalStateException") {
+        shouldThrow<CancellationException> {
+            onExpectedFailure(onFailure = { "swallowed" }) { throw CancellationException("cancelled") }
+        }
+        shouldThrow<CancellationException> {
+            onExpectedFailureSuspend(onFailure = { "swallowed" }) { throw CancellationException("cancelled") }
         }
     }
 

@@ -20,7 +20,11 @@ object ModeOperations {
         makerApiToken: String,
         hubIp: String
     ): Result<List<ModeInfo>> {
-        return onExpectedFailureSuspend(onFailure = { Result.failure(it) }) {
+        return onExpectedFailureSuspend(
+            // Handlers print the failure message into chat; network exception
+            // text can carry the request URL with access_token - redact.
+            onFailure = { Result.failure(IllegalStateException(KtorNetworkClient.redactSecrets(it.message), it)) }
+        ) {
             val modesJson = networkClient.getBody(
                 "http://${hubIp}/apps/api/${makerApiAppId}/modes",
                 mapOf("access_token" to makerApiToken)
@@ -50,7 +54,11 @@ object ModeOperations {
         hubIp: String,
         modeName: String
     ): Result<String> {
-        return onExpectedFailureSuspend(onFailure = { Result.failure(it) }) {
+        return onExpectedFailureSuspend(
+            // Handlers print the failure message into chat; network exception
+            // text can carry the request URL with access_token - redact.
+            onFailure = { Result.failure(IllegalStateException(KtorNetworkClient.redactSecrets(it.message), it)) }
+        ) {
             // First get all modes to find the ID (Maker API uses GET for all commands)
             val modesResult = getAllModes(networkClient, makerApiAppId, makerApiToken, hubIp)
             val modeId = modesResult.getOrNull()?.let { findModeIdByName(it, modeName) }

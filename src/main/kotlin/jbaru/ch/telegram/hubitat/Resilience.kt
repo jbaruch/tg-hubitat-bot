@@ -1,6 +1,7 @@
 package jbaru.ch.telegram.hubitat
 
 import java.io.IOException
+import java.util.concurrent.CancellationException
 import kotlinx.serialization.SerializationException
 
 /**
@@ -18,6 +19,10 @@ import kotlinx.serialization.SerializationException
 internal fun <T> onExpectedFailure(onFailure: (Exception) -> T, block: () -> T): T =
     try {
         block()
+    } catch (e: CancellationException) {
+        // CancellationException SUBCLASSES IllegalStateException - without
+        // this clause the next catch would swallow coroutine cancellation.
+        throw e
     } catch (e: IOException) {
         onFailure(e)
     } catch (e: IllegalStateException) {
@@ -35,6 +40,10 @@ internal suspend fun <T> onExpectedFailureSuspend(
 ): T =
     try {
         block()
+    } catch (e: CancellationException) {
+        // See the non-suspend variant: CancellationException subclasses
+        // IllegalStateException and must never be funneled into onFailure.
+        throw e
     } catch (e: IOException) {
         onFailure(e)
     } catch (e: IllegalStateException) {

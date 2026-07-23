@@ -467,6 +467,24 @@ class CommandHandlersTest : FunSpec({
             result shouldContain "Could not read: Back Door"
         }
 
+        test("should truncate an oversized reply under the Telegram limit") {
+            val sensors = (1..200).map {
+                Device.GenericZigbeeContactSensor(it, "Sensor With A Fairly Long Name Number $it")
+            }
+            whenever(deviceManager.findDevicesByType(Device.ContactSensor::class.java))
+                .thenReturn(sensors)
+            whenever(networkClient.getBody(any(), any()))
+                .thenReturn("""{"value": "open"}""")
+
+            val result = CommandHandlers.handleGetOpenSensorsCommand(
+                deviceManager, networkClient,
+                makerApiAppId, makerApiToken, defaultHubIp
+            )
+
+            (result.length <= 4000) shouldBe true
+            result shouldContain "truncated"
+        }
+
         test("should treat a sensor with no value attribute as not open") {
             // Covers the '?: \"Unknown\"' fallback in getDeviceAttribute.
             val sensor = Device.GenericZigbeeContactSensor(1, "Front Door")

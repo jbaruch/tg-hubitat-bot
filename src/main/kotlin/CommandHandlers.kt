@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory
 object CommandHandlers {
 
     private val logger = LoggerFactory.getLogger(CommandHandlers::class.java)
+    private const val MAX_MESSAGE_LENGTH = 3900
 
     suspend fun handleDeviceCommand(
         bot: Bot,
@@ -166,7 +167,7 @@ object CommandHandlers {
         val openSensors = states.filter { it.second == "open" }.joinToString("\n") { it.first.label }
         val unreadable = states.filter { it.second == null }.joinToString(", ") { it.first.label }
 
-        buildString {
+        val reply = buildString {
             append(
                 if (openSensors.isNotEmpty()) "Open Sensors:\n$openSensors" else "No open sensors found."
             )
@@ -174,6 +175,9 @@ object CommandHandlers {
                 append("\nCould not read: $unreadable")
             }
         }
+        // Telegram caps messages at 4096 chars; a large install can exceed it.
+        if (reply.length <= MAX_MESSAGE_LENGTH) reply
+        else reply.take(MAX_MESSAGE_LENGTH) + "\n… (truncated)"
     }
     
     suspend fun handleGetModeCommand(

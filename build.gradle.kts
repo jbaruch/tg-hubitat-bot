@@ -219,21 +219,10 @@ tasks.named("jibBuildTar") {
 
 
 // Static-analysis tooling. detekt 2.0.0-alpha.5 supports the JVM 25 toolchain
-// (1.23.x caps at jvmTarget 22). Run on demand with `./gradlew detekt`.
-// No CI gate yet: per language-diagnostics "Adopting on a Dirty Tree", the gate
-// is wired only once the tree reports zero findings — fixes land first, in
-// separate PRs, then a final PR adds the CI step.
+// (1.23.x caps at jvmTarget 22). The tree is at zero findings and detekt sits
+// on the `check` lifecycle (the plugin default), so CI's gradle build gates on
+// it - a new finding fails the build.
 detekt {
     buildUponDefaultConfig = true
     config.setFrom(files("config/detekt/detekt.yml"))
-}
-
-// Adoption phase: keep detekt OFF the `check`/`build` lifecycle so CI stays
-// green while the tree is still dirty. The plugin auto-wires `:detekt` into
-// `check`; detach it so it runs on demand only (`./gradlew detekt`). The gate PR
-// re-attaches it once findings reach zero.
-tasks.named("check") {
-    setDependsOn(dependsOn.filterNot {
-        (it as? TaskProvider<*>)?.name?.startsWith("detekt") == true
-    })
 }

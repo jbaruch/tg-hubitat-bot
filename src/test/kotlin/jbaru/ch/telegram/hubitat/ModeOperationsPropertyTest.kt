@@ -101,7 +101,11 @@ class ModeOperationsPropertyTest : FunSpec({
     // **Feature: modes-control, Property 4: Invalid mode name rejection**
     // **Validates: Requirements 3.3**
     test("setMode with invalid mode name should fail").config(invocations = 100) {
-        checkAll(PropTestConfig(seed = FIXED_SEED, iterations = PROP_ITERATIONS), Arb.modeInfoList(), Arb.string(1..20)) { modes, invalidName ->
+        checkAll(
+            PropTestConfig(seed = FIXED_SEED, iterations = PROP_ITERATIONS),
+            Arb.modeInfoList(),
+            Arb.string(1..20)
+        ) { modes, invalidName ->
             val networkClient = mock<NetworkClient>()
             val modesJson = modes.toJson()
             

@@ -1,0 +1,142 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>CyclomaticComplexMethod:FirmwareOperations.kt:FirmwareOperations$fun classify: FirmwareFinding</ID>
+    <ID>CyclomaticComplexMethod:FirmwareOperations.kt:FirmwareOperations$fun formatReport: List&lt;String&gt;</ID>
+    <ID>CyclomaticComplexMethod:HubOperations.kt:HubOperations$suspend fun updateHubsWithPolling: Result&lt;String&gt;</ID>
+    <ID>CyclomaticComplexMethod:Main.kt:fun main</ID>
+    <ID>EmptyDefaultConstructor:Device.kt:Device.Actuator</ID>
+    <ID>EmptyDefaultConstructor:Device.kt:Device.Button</ID>
+    <ID>EmptyDefaultConstructor:Device.kt:Device.ContactSensor</ID>
+    <ID>EmptyDefaultConstructor:Device.kt:Device.Dimmer</ID>
+    <ID>EmptyDefaultConstructor:Device.kt:Device.Sensor</ID>
+    <ID>EmptyDefaultConstructor:Device.kt:Device.Shade</ID>
+    <ID>InvalidPackageDeclaration:BotConfiguration.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:BotConfigurationTest.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:CommandFlowIntegrationTest.kt:package jbaru.ch.telegram.hubitat.integration</ID>
+    <ID>InvalidPackageDeclaration:CommandHandlers.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:CommandHandlersPropertyTest.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:CommandHandlersTest.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:Device.kt:package jbaru.ch.telegram.hubitat.model</ID>
+    <ID>InvalidPackageDeclaration:DeviceAbbreviator.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:DeviceAbbreviatorExtraTest.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:DeviceAbbreviatorPropertyTest.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:DeviceAbbreviatorTest.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:DeviceCommandFilterTest.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:DeviceManager.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:FirmwareCatalog.kt:package jbaru.ch.telegram.hubitat.model</ID>
+    <ID>InvalidPackageDeclaration:FirmwareOperations.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:FirmwareOperationsTest.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:HubOperations.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:HubOperationsPropertyTest.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:HubOperationsTest.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:HubUpdateIntegrationTest.kt:package jbaru.ch.telegram.hubitat.integration</ID>
+    <ID>InvalidPackageDeclaration:Main.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:ModeCommandHandlersTest.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:ModeOperations.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:ModeOperationsPropertyTest.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:ModeOperationsTest.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:NetworkClient.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:NetworkClientTest.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:RealFirmwareCheckTest.kt:package jbaru.ch.telegram.hubitat.integration</ID>
+    <ID>InvalidPackageDeclaration:RealHubitatApiTest.kt:package jbaru.ch.telegram.hubitat.integration</ID>
+    <ID>InvalidPackageDeclaration:StringUtils.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:StringUtilsPropertyTest.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>InvalidPackageDeclaration:StringUtilsTest.kt:package jbaru.ch.telegram.hubitat</ID>
+    <ID>LongMethod:FirmwareOperations.kt:FirmwareOperations$fun classify: FirmwareFinding</ID>
+    <ID>LongMethod:FirmwareOperations.kt:FirmwareOperations$fun formatReport: List&lt;String&gt;</ID>
+    <ID>LongMethod:HubOperations.kt:HubOperations$suspend fun updateHubsWithPolling: Result&lt;String&gt;</ID>
+    <ID>LongMethod:Main.kt:fun main</ID>
+    <ID>MagicNumber:HubOperations.kt:HubOperations$10</ID>
+    <ID>MagicNumber:Main.kt:64</ID>
+    <ID>MagicNumber:ModeOperations.kt:ModeOperations$200</ID>
+    <ID>MagicNumber:ModeOperations.kt:ModeOperations$299</ID>
+    <ID>MaxLineLength:DeviceAbbreviator.kt:DeviceAbbreviator$abbreviationMap[currentAbbreviation]!!.add(deviceAbbreviation)</ID>
+    <ID>MaxLineLength:DeviceManager.kt:DeviceManager$Result.failure(IllegalArgumentException("Command '$command' is not supported by device '${device.label}'"))</ID>
+    <ID>MaxLineLength:DeviceManager.kt:DeviceManager$appendLine("| ${escapeMarkdownCode(device.label).padEnd(maxDeviceNameLength)} | ${aliasesString.padEnd(maxAliasesLength)} |")</ID>
+    <ID>MaxLineLength:DeviceManager.kt:DeviceManager$tableBuilder.appendLine("+" + "-".repeat(maxDeviceNameLength + 2) + "+" + "-".repeat(maxAliasesLength + 2) + "+")</ID>
+    <ID>MaxLineLength:DeviceManagerTest.kt:DeviceManagerTest$assertEquals("Command 'on' is not supported by device 'Master Bedroom Shades'", result.exceptionOrNull()?.message)</ID>
+    <ID>MaxLineLength:FirmwareOperations.kt:FirmwareOperations$"Z-Wave firmware report: ${findings.size} devices on $hubCount hub(s), catalog ${catalog.catalogVersion}$catalogSuffix"</ID>
+    <ID>MaxLineLength:FirmwareOperations.kt:FirmwareOperations$?:</ID>
+    <ID>MaxLineLength:FirmwareOperations.kt:FirmwareOperations$section.append("• ${it.device.name} [${it.device.hubLabel}] ${it.entry?.model ?: it.device.driverType}: ${it.detail}\n")</ID>
+    <ID>MaxLineLength:FirmwareOperationsTest.kt:FirmwareOperationsTest$.</ID>
+    <ID>MaxLineLength:FirmwareOperationsTest.kt:FirmwareOperationsTest$FirmwareOperations.classify(device(name = "Bath Light", deviceModel = "ZEN76", firmwareVersion = "3.30"), testCatalog)</ID>
+    <ID>MaxLineLength:FirmwareOperationsTest.kt:FirmwareOperationsTest$FirmwareOperations.classify(device(name = "Closet", deviceModel = "ZEN76", firmwareVersion = "3.60"), testCatalog)</ID>
+    <ID>MaxLineLength:FirmwareOperationsTest.kt:FirmwareOperationsTest$FirmwareOperations.classify(device(name = "Fan", deviceModel = "ZEN76", firmwareVersion = "3.40"), testCatalog)</ID>
+    <ID>MaxLineLength:FirmwareOperationsTest.kt:FirmwareOperationsTest$FirmwareOperations.classify(device(name = "Mystery", deviceModel = "UNK00", firmwareVersion = "1.0"), testCatalog)</ID>
+    <ID>MaxLineLength:FirmwareOperationsTest.kt:FirmwareOperationsTest$FirmwareOperations.classify(device(name = "Shade", driverType = "Springs Window Fashions Roller Shade"), testCatalog)</ID>
+    <ID>MaxLineLength:FirmwareOperationsTest.kt:FirmwareOperationsTest$device(name = "Device with a fairly long descriptive name $it", deviceModel = "ZEN76", firmwareVersion = "3.40")</ID>
+    <ID>MaxLineLength:FirmwareOperationsTest.kt:FirmwareOperationsTest$device(name = "Front Lock", driverType = "Generic Z-Wave Lock", firmwareVersion = "1.01", manufacturer = 1106, deviceType = 4, productId = 1)</ID>
+    <ID>MaxLineLength:FirmwareOperationsTest.kt:FirmwareOperationsTest$devices.first { it.name == "Left Shade" }.readError.shouldNotBeNull() shouldContain "deviceFirmware/details failed"</ID>
+    <ID>MaxLineLength:FirmwareOperationsTest.kt:FirmwareOperationsTest$val</ID>
+    <ID>MaxLineLength:HubOperations.kt:HubOperations$logger.warn("Skipping hub '${hub.label}' (id=${hub.id}): ${KtorNetworkClient.redactSecrets(e.message?.substringBefore('\n'))}")</ID>
+    <ID>MaxLineLength:HubOperations.kt:HubOperations$logger.warn("Skipping hub '${hub.label}' (id=${hub.id}): no localIP attribute exposed via Maker API")</ID>
+    <ID>MaxLineLength:HubOperations.kt:HubOperations$progressCallback("Progress: ${currentProgress.successCount}/${currentProgress.totalHubs} updated, ${currentProgress.inProgressHubs.size} still updating")</ID>
+    <ID>MaxLineLength:HubOperations.kt:HubOperations$return Result.failure(Exception("Failed to initiate update for hub ${hub.label}: ${response.status}"))</ID>
+    <ID>MaxLineLength:HubOperationsTest.kt:HubOperationsTest$val (current, available) = HubOperations.getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)</ID>
+    <ID>MaxLineLength:HubOperationsTest.kt:HubOperationsTest$whenever(networkClient.getBody(argThat { equals("http://192.168.1.100/hub/advanced/getManagementToken") }, any()))</ID>
+    <ID>MaxLineLength:HubUpdateIntegrationTest.kt:HubUpdateIntegrationTest$content = ByteReadChannel("""{"attributes":[{"name":"firmwareVersionString","currentValue":"$currentVersion"},{"name":"hubUpdateVersion","currentValue":"2.3.9.184"}]}""")</ID>
+    <ID>MaxLineLength:HubUpdateIntegrationTest.kt:HubUpdateIntegrationTest$content = ByteReadChannel("""{"attributes":[{"name":"firmwareVersionString","currentValue":"2.3.9.184"},{"name":"hubUpdateVersion","currentValue":"2.3.9.184"}]}""")</ID>
+    <ID>MaxLineLength:Main.kt:bot.sendMessage(chatId = chatId, text = "Something went wrong listing devices. Check the bot logs for details.")</ID>
+    <ID>MaxLineLength:Main.kt:logger.warn("Could not resolve the bot's username via getMe(); mention-form commands (/cmd@BotName) will be ignored")</ID>
+    <ID>MaxLineLength:NetworkClientTest.kt:NetworkClientTest$redacted shouldBe "Request timeout has expired [url=http://hub/apps/api/398/devices?access_token=[REDACTED]&amp;x=1]"</ID>
+    <ID>MaxLineLength:RealHubitatApiTest.kt:RealHubitatApiTest$*</ID>
+    <ID>MaxLineLength:RealHubitatApiTest.kt:RealHubitatApiTest$content = ByteReadChannel("""{"attributes":[{"name":"firmwareVersionString","currentValue":"2.4.3.172"},{"name":"hubUpdateVersion","currentValue":"2.4.3.172"}]}""")</ID>
+    <ID>MaxLineLength:RealHubitatApiTest.kt:RealHubitatApiTest$println("HUB_INFO_DEVICE_ID: ${if (hubInfoDeviceId != null) hubInfoDeviceId else "NOT SET (optional for discovery)"}")</ID>
+    <ID>MaxLineLength:RealHubitatApiTest.kt:RealHubitatApiTest$test("should list all devices from real Maker API and find Hub Information Drivers")</ID>
+    <ID>MaxLineLength:StringUtilsPropertyTest.kt:StringUtilsPropertyTest$test("snakeToCamelCase should capitalize first letter of each word after first and remove underscores")</ID>
+    <ID>ReturnCount:CommandHandlers.kt:CommandHandlers$suspend fun handleDeviceCommand: String</ID>
+    <ID>ReturnCount:CommandHandlers.kt:CommandHandlers$suspend fun handleSetModeCommand: String</ID>
+    <ID>ReturnCount:DeviceAbbreviator.kt:DeviceAbbreviator$fun getAbbreviation: Result&lt;String&gt;</ID>
+    <ID>ReturnCount:FirmwareOperations.kt:FirmwareOperations$fun classify: FirmwareFinding</ID>
+    <ID>ReturnCount:HubOperations.kt:HubOperations$suspend fun updateHubsWithPolling: Result&lt;String&gt;</ID>
+    <ID>ReturnCount:Main.kt:DeviceCommandFilter$override fun Message.predicate: Boolean</ID>
+    <ID>ReturnCount:ModeOperations.kt:ModeOperations$suspend fun setMode: Result&lt;String&gt;</ID>
+    <ID>ThrowsCount:BotConfiguration.kt:BotConfiguration.Companion$fun fromEnvironment: BotConfiguration</ID>
+    <ID>ThrowsCount:FirmwareOperations.kt:FirmwareOperations$private suspend fun readDeviceFirmware: ZwaveDeviceInfo</ID>
+    <ID>ThrowsCount:HubOperations.kt:HubOperations$suspend fun getHubVersions: Pair&lt;String, String&gt;</ID>
+    <ID>TooGenericExceptionCaught:DeviceManager.kt:DeviceManager$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:FirmwareOperations.kt:FirmwareOperations$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:HubOperations.kt:HubOperations$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:Main.kt:e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ModeOperations.kt:ModeOperations$e: Exception</ID>
+    <ID>TooGenericExceptionThrown:HubOperations.kt:HubOperations$throw Exception( "Failed to get hub info for hub '${hub.label}' from endpoint '$endpoint': " + "Received empty response. This may happen if the hub is busy or restarting." )</ID>
+    <ID>TooGenericExceptionThrown:HubOperations.kt:HubOperations$throw Exception( "Failed to get hub info for hub '${hub.label}' from endpoint '$endpoint': " + "Received incomplete response (${responseBody.length} chars): '$responseBody'. " + "This may happen if the hub is busy, restarting, or experiencing network issues." )</ID>
+    <ID>TooGenericExceptionThrown:HubOperations.kt:HubOperations$throw Exception( "Failed to parse hub info response for hub '${hub.label}' from endpoint '$endpoint': ${e.message}\n" + "Response preview: $preview", e )</ID>
+    <ID>UnusedParameter:CommandHandlers.kt:CommandHandlers$bot: Bot</ID>
+    <ID>WildcardImport:CommandFlowIntegrationTest.kt:import io.ktor.client.*</ID>
+    <ID>WildcardImport:CommandFlowIntegrationTest.kt:import io.ktor.client.engine.mock.*</ID>
+    <ID>WildcardImport:CommandFlowIntegrationTest.kt:import io.ktor.http.*</ID>
+    <ID>WildcardImport:CommandFlowIntegrationTest.kt:import io.ktor.utils.io.*</ID>
+    <ID>WildcardImport:CommandFlowIntegrationTest.kt:import jbaru.ch.telegram.hubitat.*</ID>
+    <ID>WildcardImport:CommandHandlersPropertyTest.kt:import io.kotest.property.arbitrary.*</ID>
+    <ID>WildcardImport:CommandHandlersPropertyTest.kt:import org.mockito.kotlin.*</ID>
+    <ID>WildcardImport:CommandHandlersTest.kt:import org.mockito.kotlin.*</ID>
+    <ID>WildcardImport:Device.kt:import kotlinx.serialization.*</ID>
+    <ID>WildcardImport:DeviceAbbreviatorTest.kt:import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:DeviceManagerTest.kt:import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:HubOperationsPropertyTest.kt:import org.mockito.kotlin.*</ID>
+    <ID>WildcardImport:HubOperationsTest.kt:import org.mockito.kotlin.*</ID>
+    <ID>WildcardImport:HubUpdateIntegrationTest.kt:import io.ktor.client.*</ID>
+    <ID>WildcardImport:HubUpdateIntegrationTest.kt:import io.ktor.client.engine.mock.*</ID>
+    <ID>WildcardImport:HubUpdateIntegrationTest.kt:import io.ktor.client.request.*</ID>
+    <ID>WildcardImport:HubUpdateIntegrationTest.kt:import io.ktor.http.*</ID>
+    <ID>WildcardImport:HubUpdateIntegrationTest.kt:import io.ktor.utils.io.*</ID>
+    <ID>WildcardImport:HubUpdateIntegrationTest.kt:import jbaru.ch.telegram.hubitat.*</ID>
+    <ID>WildcardImport:Main.kt:import io.ktor.client.*</ID>
+    <ID>WildcardImport:Main.kt:import io.ktor.client.engine.cio.*</ID>
+    <ID>WildcardImport:ModeCommandHandlersTest.kt:import org.mockito.kotlin.*</ID>
+    <ID>WildcardImport:ModeOperationsPropertyTest.kt:import io.kotest.property.arbitrary.*</ID>
+    <ID>WildcardImport:ModeOperationsPropertyTest.kt:import org.mockito.kotlin.*</ID>
+    <ID>WildcardImport:ModeOperationsTest.kt:import org.mockito.kotlin.*</ID>
+    <ID>WildcardImport:RealHubitatApiTest.kt:import io.ktor.client.*</ID>
+    <ID>WildcardImport:RealHubitatApiTest.kt:import io.ktor.client.engine.cio.*</ID>
+    <ID>WildcardImport:RealHubitatApiTest.kt:import io.ktor.client.engine.mock.*</ID>
+    <ID>WildcardImport:RealHubitatApiTest.kt:import io.ktor.http.*</ID>
+    <ID>WildcardImport:RealHubitatApiTest.kt:import io.ktor.utils.io.*</ID>
+    <ID>WildcardImport:RealHubitatApiTest.kt:import jbaru.ch.telegram.hubitat.*</ID>
+    <ID>WildcardImport:RealHubitatApiTest.kt:import kotlinx.serialization.json.*</ID>
+    <ID>WildcardImport:StringUtilsPropertyTest.kt:import io.kotest.property.arbitrary.*</ID>
+  </CurrentIssues>
+</SmellBaseline>

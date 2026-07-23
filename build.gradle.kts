@@ -20,6 +20,7 @@ plugins {
     id("com.google.cloud.tools.jib") version "3.5.1"
     application
     jacoco
+    id("dev.detekt") version "2.0.0-alpha.5"
 }
 
 group = "jbaru.ch"
@@ -212,4 +213,15 @@ tasks.named("jibDockerBuild") {
 
 tasks.named("jibBuildTar") {
     dependsOn(tasks.named("jibDockerBuild"))
+}
+
+
+// Static-analysis gate. detekt 2.0.0-alpha.5 supports the JVM 25 toolchain
+// (1.23.x caps at jvmTarget 22). A committed baseline snapshots the findings
+// present at adoption so CI blocks only NEW violations; burn the baseline down
+// to clear existing debt (see config/detekt/baseline.xml).
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom(files("config/detekt/detekt.yml"))
+    baseline = file("config/detekt/baseline.xml")
 }

@@ -1,0 +1,4 @@
+# detekt overrides, layered on detekt's bundled defaults
+# (buildUponDefaultConfig = true in build.gradle.kts; plugin version pins the
+# default ruleset). Add project-specific rule tuning here as the baseline in
+# config/detekt/baseline.xml is burned down. New violations are gated regardless.

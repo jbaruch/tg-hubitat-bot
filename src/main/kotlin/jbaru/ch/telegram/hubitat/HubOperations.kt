@@ -1,6 +1,7 @@
 package jbaru.ch.telegram.hubitat
 
 import io.ktor.http.HttpStatusCode
+import java.util.concurrent.CancellationException
 import jbaru.ch.telegram.hubitat.model.Device
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -210,6 +211,10 @@ object HubOperations {
         // collectVersionInfo wraps every expected failure in IllegalStateException.
         val versionInfo = try {
             collectVersionInfo(hubs, networkClient, hubIp, makerApiAppId, makerApiToken)
+        } catch (e: CancellationException) {
+            // CancellationException subclasses IllegalStateException; coroutine
+            // cancellation must propagate, not become a Result.
+            throw e
         } catch (e: IllegalStateException) {
             return Result.failure(e)
         }

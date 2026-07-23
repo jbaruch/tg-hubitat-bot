@@ -161,8 +161,9 @@ object FirmwareOperations {
     }
 
     private fun unreadable(base: ZwaveDeviceInfo, hub: Device.Hub, e: Exception): ZwaveDeviceInfo {
-        logger.warn("Failed to read firmware info for '{}' on {}: {}", base.name, hub.label, e.message)
-        return base.copy(readError = e.message ?: e.toString())
+        val reason = KtorNetworkClient.redactSecrets(e.message ?: e.toString())
+        logger.warn("Failed to read firmware info for '{}' on {}: {}", base.name, hub.label, reason)
+        return base.copy(readError = reason)
     }
 
     private suspend fun readDeviceFirmware(

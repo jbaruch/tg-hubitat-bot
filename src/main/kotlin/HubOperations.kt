@@ -71,7 +71,7 @@ object HubOperations {
                 hub.managementToken = networkClient.getBody("http://${ip}/hub/advanced/getManagementToken")
                 initialized.add(hub)
             } catch (e: Exception) {
-                logger.warn("Skipping hub '${hub.label}' (id=${hub.id}): ${e.message?.substringBefore('\n') ?: e}")
+                logger.warn("Skipping hub '${hub.label}' (id=${hub.id}): ${KtorNetworkClient.redactSecrets(e.message?.substringBefore('\n'))}")
             }
         }
         return initialized

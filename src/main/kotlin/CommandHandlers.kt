@@ -251,7 +251,7 @@ object CommandHandlers {
     }
     
     private fun logUnreadableSensor(label: String, e: Exception) {
-        logger.warn("Could not read contact state of '{}': {}", label, e.message)
+        logger.warn("Could not read contact state of '{}': {}", label, KtorNetworkClient.redactSecrets(e.message))
     }
 
     private suspend fun runDeviceCommand(

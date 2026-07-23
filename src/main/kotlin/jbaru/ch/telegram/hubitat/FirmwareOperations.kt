@@ -189,7 +189,9 @@ object FirmwareOperations {
 
         if (info.firmwareVersion == null) {
             val nodeId = base.dni.toIntOrNull(16)
-                ?: throw IllegalStateException("driver reports no firmware version and DNI '${base.dni}' is not a Z-Wave node id")
+                ?: throw IllegalStateException(
+                    "driver reports no firmware version and DNI '${base.dni}' is not a Z-Wave node id"
+                )
             val details = Json.parseToJsonElement(
                 networkClient.getBody("http://${hub.ip}/hub/zwave/deviceFirmware/details?nodeId=$nodeId")
             ).jsonObject
@@ -293,7 +295,8 @@ object FirmwareOperations {
         val hubCount = findings.map { it.device.hubLabel }.distinct().size
         val catalogSuffix = if (catalogNote != null) " ($catalogNote)" else ""
         sections.add(
-            "Z-Wave firmware report: ${findings.size} devices on $hubCount hub(s), catalog ${catalog.catalogVersion}$catalogSuffix"
+            "Z-Wave firmware report: ${findings.size} devices on $hubCount hub(s), " +
+                "catalog ${catalog.catalogVersion}$catalogSuffix"
         )
 
         byStatus[FirmwareStatus.UPDATE_AVAILABLE]?.let { updates ->
@@ -327,7 +330,10 @@ object FirmwareOperations {
         byStatus[FirmwareStatus.CHECK_MANUALLY]?.let { manual ->
             val section = StringBuilder("❓ Check manually (${manual.size}):\n")
             manual.forEach {
-                section.append("• ${it.device.name} [${it.device.hubLabel}] ${it.entry?.model ?: it.device.driverType}: ${it.detail}\n")
+                section.append(
+                    "• ${it.device.name} [${it.device.hubLabel}] " +
+                        "${it.entry?.model ?: it.device.driverType}: ${it.detail}\n"
+                )
             }
             sections.add(section.toString().trimEnd())
         }

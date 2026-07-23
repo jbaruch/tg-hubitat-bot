@@ -1,16 +1,17 @@
 package jbaru.ch.telegram.hubitat
+import io.kotest.property.arbitrary.string
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotContain
 import io.kotest.property.Arb
-import io.kotest.property.arbitrary.*
 import io.kotest.property.checkAll
 
 class StringUtilsPropertyTest : FunSpec({
     
     // **Feature: test-coverage-improvement, Property 5: Snake case to camel case conversion**
-    test("snakeToCamelCase should capitalize first letter of each word after first and remove underscores").config(invocations = 100) {
+    test("snakeToCamelCase capitalizes each word after the first and removes underscores")
+        .config(invocations = 100) {
         checkAll(Arb.string(1..50)) { input ->
             val snakeCase = input.replace(" ", "_").lowercase()
             val result = snakeCase.snakeToCamelCase()

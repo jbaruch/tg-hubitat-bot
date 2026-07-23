@@ -1,9 +1,13 @@
 package jbaru.ch.telegram.hubitat
+import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.eq
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.any
+import org.mockito.kotlin.whenever
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
-import org.mockito.kotlin.*
 
 class ModeOperationsTest : FunSpec({
     

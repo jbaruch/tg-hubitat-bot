@@ -1,4 +1,6 @@
 package jbaru.ch.telegram.hubitat
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.HttpClient
 
 import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.bot
@@ -7,9 +9,7 @@ import com.github.kotlintelegrambot.dispatcher.command
 import com.github.kotlintelegrambot.dispatcher.message
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.Message
-import io.ktor.client.*
 import io.ktor.client.call.body
-import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
@@ -29,6 +29,9 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 
 private val logger = org.slf4j.LoggerFactory.getLogger("jbaru.ch.telegram.hubitat.Main")
+
+// Cap on how much of a stranger's command token reaches the logs.
+private const val UNAUTHORIZED_LOG_TOKEN_LIMIT = 64
 private lateinit var config: BotConfiguration
 // Reassigned by /refresh while /update may be reading it from another
 // dispatcher thread; volatile so readers see a complete list, old or new.
@@ -70,7 +73,7 @@ fun main() {
                 if (!isAuthorized(message)) return@message
                 replyTo(bot, message) {
                     CommandHandlers.handleDeviceCommand(
-                        bot, message, deviceManager, networkClient,
+                        message, deviceManager, networkClient,
                         config.makerApiAppId, config.makerApiToken, config.defaultHubIp
                     )
                 }
@@ -168,7 +171,10 @@ fun main() {
                 // answers contract.
                 catch (e: Exception) {
                     logger.error("List command failed", e)
-                    bot.sendMessage(chatId = chatId, text = "Something went wrong listing devices. Check the bot logs for details.")
+                    bot.sendMessage(
+                        chatId = chatId,
+                        text = "Something went wrong listing devices. Check the bot logs for details."
+                    )
                 }
             }
 
@@ -216,7 +222,9 @@ fun main() {
 
     botUsername = bot.getMe().getOrNull()?.username
     if (botUsername == null) {
-        logger.warn("Could not resolve the bot's username via getMe(); mention-form commands (/cmd@BotName) will be ignored")
+        logger.warn(
+            "Could not resolve the bot's username via getMe(); mention-form commands (/cmd@BotName) will be ignored"
+        )
     }
 
     if (config.allowedChatIds.isEmpty()) {
@@ -275,7 +283,9 @@ private fun isAuthorized(message: Message): Boolean {
         // privacy leak and a log-spam vector.
         logger.warn(
             "Dropping command from unauthorized chat {} (user {}): {}",
-            message.chat.id, message.from?.id, message.text?.split(" ")?.firstOrNull()?.take(64)
+            message.chat.id,
+            message.from?.id,
+            message.text?.split(" ")?.firstOrNull()?.take(UNAUTHORIZED_LOG_TOKEN_LIMIT)
         )
     }
     return allowed

@@ -1,6 +1,10 @@
+package jbaru.ch.telegram.hubitat
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertEquals
+
 import jbaru.ch.telegram.hubitat.DeviceManager
 import jbaru.ch.telegram.hubitat.model.Device
-import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -87,7 +91,10 @@ class DeviceManagerTest {
     fun `test shade device with incorrect command`() {
         val result = deviceManager.findDevice("Master Bedroom Shades", "on")
         assertTrue(result.isFailure)
-        assertEquals("Command 'on' is not supported by device 'Master Bedroom Shades'", result.exceptionOrNull()?.message)
+        assertEquals(
+            "Command 'on' is not supported by device 'Master Bedroom Shades'",
+            result.exceptionOrNull()?.message
+        )
     }
 
     @Test

@@ -3,3 +3,9 @@
 # fixes the default ruleset). No baseline and no CI gate during adoption: detekt
 # runs on demand only (`./gradlew detekt`). Add project-specific rule tuning here
 # as findings are cleaned up; a later PR wires the CI gate once the tree is zero.
+
+style:
+  MaxLineLength:
+    # Raw strings are JSON fixtures in tests - breaking them mangles the
+    # payload for no readability gain.
+    excludeRawStrings: true

@@ -1,4 +1,5 @@
 package jbaru.ch.telegram.hubitat
+import io.ktor.http.isSuccess
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -68,7 +69,7 @@ object ModeOperations {
                 mapOf("access_token" to makerApiToken)
             )
             
-            if (response.status.value in 200..299) {
+            if (response.status.isSuccess()) {
                 Result.success("Mode changed to $modeName")
             } else {
                 Result.failure(Exception("Failed to set mode: ${response.status}"))

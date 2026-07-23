@@ -1,4 +1,10 @@
 package jbaru.ch.telegram.hubitat
+import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.eq
+import org.mockito.kotlin.argThat
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.any
+import org.mockito.kotlin.whenever
 
 import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.entities.Message
@@ -8,7 +14,6 @@ import io.kotest.matchers.string.shouldContain
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.HttpStatusCode
 import jbaru.ch.telegram.hubitat.model.Device
-import org.mockito.kotlin.*
 
 class CommandHandlersTest : FunSpec({
     
@@ -40,7 +45,7 @@ class CommandHandlersTest : FunSpec({
             whenever(networkClient.get(any(), any())).thenReturn(mockResponse)
             
             val result = CommandHandlers.handleDeviceCommand(
-                bot, message, deviceManager, networkClient,
+                message, deviceManager, networkClient,
                 makerApiAppId, makerApiToken, defaultHubIp
             )
             
@@ -53,7 +58,7 @@ class CommandHandlersTest : FunSpec({
             }
             
             val result = CommandHandlers.handleDeviceCommand(
-                bot, message, deviceManager, networkClient,
+                message, deviceManager, networkClient,
                 makerApiAppId, makerApiToken, defaultHubIp
             )
             
@@ -71,7 +76,7 @@ class CommandHandlersTest : FunSpec({
                 .thenReturn(Result.success(device))
             
             val result = CommandHandlers.handleDeviceCommand(
-                bot, message, deviceManager, networkClient,
+                message, deviceManager, networkClient,
                 makerApiAppId, makerApiToken, defaultHubIp
             )
             
@@ -86,7 +91,7 @@ class CommandHandlersTest : FunSpec({
                 .thenReturn(Result.failure(Exception("No device found for query: unknown_device")))
             
             val result = CommandHandlers.handleDeviceCommand(
-                bot, message, deviceManager, networkClient,
+                message, deviceManager, networkClient,
                 makerApiAppId, makerApiToken, defaultHubIp
             )
             
@@ -107,7 +112,7 @@ class CommandHandlersTest : FunSpec({
                 )
 
             val result = CommandHandlers.handleDeviceCommand(
-                bot, message, deviceManager, networkClient,
+                message, deviceManager, networkClient,
                 makerApiAppId, makerApiToken, defaultHubIp
             )
 
@@ -120,7 +125,7 @@ class CommandHandlersTest : FunSpec({
             }
 
             val result = CommandHandlers.handleDeviceCommand(
-                bot, message, deviceManager, networkClient,
+                message, deviceManager, networkClient,
                 makerApiAppId, makerApiToken, defaultHubIp
             )
 
@@ -145,7 +150,7 @@ class CommandHandlersTest : FunSpec({
                 .thenReturn(mockResponse)
 
             val result = CommandHandlers.handleDeviceCommand(
-                bot, message, deviceManager, networkClient,
+                message, deviceManager, networkClient,
                 makerApiAppId, makerApiToken, defaultHubIp
             )
 
@@ -169,7 +174,7 @@ class CommandHandlersTest : FunSpec({
                 .thenReturn(mockResponse)
 
             val result = CommandHandlers.handleDeviceCommand(
-                bot, message, deviceManager, networkClient,
+                message, deviceManager, networkClient,
                 makerApiAppId, makerApiToken, defaultHubIp
             )
 
@@ -190,7 +195,7 @@ class CommandHandlersTest : FunSpec({
             whenever(networkClient.get(any(), any())).thenReturn(mockResponse)
 
             val result = CommandHandlers.handleDeviceCommand(
-                bot, message, deviceManager, networkClient,
+                message, deviceManager, networkClient,
                 makerApiAppId, makerApiToken, defaultHubIp
             )
 
@@ -216,7 +221,7 @@ class CommandHandlersTest : FunSpec({
             whenever(networkClient.get(any(), any())).thenReturn(mockResponse)
 
             val result = CommandHandlers.handleDeviceCommand(
-                bot, message, deviceManager, networkClient,
+                message, deviceManager, networkClient,
                 makerApiAppId, makerApiToken, defaultHubIp
             )
 
@@ -240,7 +245,7 @@ class CommandHandlersTest : FunSpec({
                 .thenReturn(mockResponse)
 
             val result = CommandHandlers.handleDeviceCommand(
-                bot, message, deviceManager, networkClient,
+                message, deviceManager, networkClient,
                 makerApiAppId, makerApiToken, defaultHubIp
             )
 
@@ -267,7 +272,7 @@ class CommandHandlersTest : FunSpec({
                 .thenReturn(mockResponse)
 
             val result = CommandHandlers.handleDeviceCommand(
-                bot, message, deviceManager, networkClient,
+                message, deviceManager, networkClient,
                 makerApiAppId, makerApiToken, defaultHubIp
             )
 
@@ -290,7 +295,7 @@ class CommandHandlersTest : FunSpec({
             whenever(networkClient.get(any(), any())).thenReturn(mockResponse)
 
             val result = CommandHandlers.handleDeviceCommand(
-                bot, message, deviceManager, networkClient,
+                message, deviceManager, networkClient,
                 makerApiAppId, makerApiToken, defaultHubIp
             )
 
@@ -303,7 +308,7 @@ class CommandHandlersTest : FunSpec({
             }
 
             val result = CommandHandlers.handleDeviceCommand(
-                bot, message, deviceManager, networkClient,
+                message, deviceManager, networkClient,
                 makerApiAppId, makerApiToken, defaultHubIp
             )
 
@@ -318,7 +323,7 @@ class CommandHandlersTest : FunSpec({
                 .thenReturn(Result.failure(Exception("No device found for query: probe")))
 
             val result = CommandHandlers.handleDeviceCommand(
-                bot, message, deviceManager, networkClient,
+                message, deviceManager, networkClient,
                 makerApiAppId, makerApiToken, defaultHubIp
             )
 

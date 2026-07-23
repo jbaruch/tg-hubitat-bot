@@ -24,7 +24,6 @@ object CommandHandlers {
     private const val MAX_MESSAGE_LENGTH = 3900
 
     suspend fun handleDeviceCommand(
-        bot: Bot,
         message: Message,
         deviceManager: DeviceManager,
         networkClient: NetworkClient,

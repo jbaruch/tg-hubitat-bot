@@ -1,16 +1,21 @@
 package jbaru.ch.telegram.hubitat
+import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.eq
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.any
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
+import io.kotest.property.arbitrary.string
 
 import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.entities.Message
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
-import io.kotest.property.arbitrary.*
 import io.kotest.property.checkAll
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.HttpStatusCode
 import jbaru.ch.telegram.hubitat.model.Device
-import org.mockito.kotlin.*
 
 class CommandHandlersPropertyTest : FunSpec({
     
@@ -41,7 +46,7 @@ class CommandHandlersPropertyTest : FunSpec({
                     }
                     
                     val result = CommandHandlers.handleDeviceCommand(
-                        bot, message, deviceManager, networkClient,
+                        message, deviceManager, networkClient,
                         "test-app", "test-token", "test-hub"
                     )
                     

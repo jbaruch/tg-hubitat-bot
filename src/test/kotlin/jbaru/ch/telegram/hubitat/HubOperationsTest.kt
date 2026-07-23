@@ -1,4 +1,10 @@
 package jbaru.ch.telegram.hubitat
+import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.eq
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.any
+import org.mockito.kotlin.argThat
+import org.mockito.kotlin.whenever
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.core.Tag
@@ -9,7 +15,6 @@ import io.ktor.client.engine.cio.CIO
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.HttpStatusCode
 import jbaru.ch.telegram.hubitat.model.Device
-import org.mockito.kotlin.*
 
 object RealHubTest : Tag()
 
@@ -42,7 +47,9 @@ class HubOperationsTest : FunSpec({
             
             whenever(networkClient.getBody(argThat { contains("/devices/1") }, any()))
                 .thenReturn(hubDetailsJson)
-            whenever(networkClient.getBody(argThat { equals("http://192.168.1.100/hub/advanced/getManagementToken") }, any()))
+            whenever(
+                networkClient.getBody(argThat { equals("http://192.168.1.100/hub/advanced/getManagementToken") }, any())
+            )
                 .thenReturn("test-management-token")
             
             val result = HubOperations.initializeHubs(
@@ -206,7 +213,8 @@ class HubOperationsTest : FunSpec({
             whenever(networkClient.getBody(eq("http://hubitat.local/apps/api/test-app-id/devices/1"), any()))
                 .thenReturn(makerApiResponse)
             
-            val (current, available) = HubOperations.getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
+            val (current, available) =
+                HubOperations.getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
             
             current shouldBe "2.3.4.150"
             available shouldBe "2.3.5.160"
@@ -226,7 +234,8 @@ class HubOperationsTest : FunSpec({
             whenever(networkClient.getBody(eq("http://hubitat.local/apps/api/test-app-id/devices/1"), any()))
                 .thenReturn(makerApiResponse)
             
-            val (current, available) = HubOperations.getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
+            val (current, available) =
+                HubOperations.getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
             
             current shouldBe ""
             available shouldBe ""
@@ -241,7 +250,8 @@ class HubOperationsTest : FunSpec({
             whenever(networkClient.getBody(eq("http://hubitat.local/apps/api/test-app-id/devices/1"), any()))
                 .thenReturn(makerApiResponse)
 
-            val (current, available) = HubOperations.getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
+            val (current, available) =
+                HubOperations.getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
 
             current shouldBe ""
             available shouldBe ""

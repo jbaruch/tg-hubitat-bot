@@ -1,14 +1,17 @@
 package jbaru.ch.telegram.hubitat.integration
+import jbaru.ch.telegram.hubitat.HubOperations
+import jbaru.ch.telegram.hubitat.KtorNetworkClient
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
+import io.ktor.client.engine.mock.respond
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.HttpClient
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
-import io.ktor.client.*
-import io.ktor.client.engine.mock.*
-import io.ktor.client.request.*
-import io.ktor.http.*
-import io.ktor.utils.io.*
-import jbaru.ch.telegram.hubitat.*
 import jbaru.ch.telegram.hubitat.model.Device
 
 /**
@@ -26,7 +29,10 @@ class HubUpdateIntegrationTest : FunSpec({
                     callCount++
                     val currentVersion = if (callCount <= 2) "2.3.9.183" else "2.3.9.184"
                     respond(
-                        content = ByteReadChannel("""{"attributes":[{"name":"firmwareVersionString","currentValue":"$currentVersion"},{"name":"hubUpdateVersion","currentValue":"2.3.9.184"}]}"""),
+                        content = ByteReadChannel(
+                            """{"attributes":[{"name":"firmwareVersionString","currentValue":"$currentVersion"},""" +
+                            """{"name":"hubUpdateVersion","currentValue":"2.3.9.184"}]}"""
+                        ),
                         status = HttpStatusCode.OK,
                         headers = headersOf(HttpHeaders.ContentType, "application/json")
                     )
@@ -83,7 +89,10 @@ class HubUpdateIntegrationTest : FunSpec({
                 request.url.encodedPath.contains("/apps/api/") && request.url.encodedPath.contains("/devices/1") -> {
                     // Maker API device endpoint - hub already up to date
                     respond(
-                        content = ByteReadChannel("""{"attributes":[{"name":"firmwareVersionString","currentValue":"2.3.9.184"},{"name":"hubUpdateVersion","currentValue":"2.3.9.184"}]}"""),
+                        content = ByteReadChannel(
+                            """{"attributes":[{"name":"firmwareVersionString","currentValue":"2.3.9.184"},""" +
+                            """{"name":"hubUpdateVersion","currentValue":"2.3.9.184"}]}"""
+                        ),
                         status = HttpStatusCode.OK,
                         headers = headersOf(HttpHeaders.ContentType, "application/json")
                     )

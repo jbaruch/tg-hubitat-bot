@@ -85,7 +85,8 @@ class NetworkClientTest : FunSpec({
             val msg = "Request timeout has expired [url=http://hub/apps/api/398/devices?access_token=abc123&x=1]"
             val redacted = KtorNetworkClient.redactSecrets(msg)
             (redacted.contains("abc123")) shouldBe false
-            redacted shouldBe "Request timeout has expired [url=http://hub/apps/api/398/devices?access_token=[REDACTED]&x=1]"
+            redacted shouldBe
+                "Request timeout has expired [url=http://hub/apps/api/398/devices?access_token=[REDACTED]&x=1]"
             KtorNetworkClient.redactSecrets(null) shouldBe "unknown error"
         }
 

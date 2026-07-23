@@ -1,7 +1,8 @@
 @file:Suppress("unused")
 
 package jbaru.ch.telegram.hubitat.model
-import kotlinx.serialization.*
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 // Shared constants behind the getter-only overrides: the getters keep these
 // type-level tables out of serialization, the constants keep every access from
@@ -23,36 +24,36 @@ sealed class Device {
     abstract val attributes: Map<String, List<String>>
 
     @Serializable
-    sealed class Actuator() : Device() {
+    sealed class Actuator : Device() {
         override val supportedOps: Map<String, Int> get() = ACTUATOR_OPS
         override val attributes: Map<String, List<String>> get() = NO_ATTRIBUTES
 
     }
 
     @Serializable
-    sealed class Dimmer() : Actuator() {
+    sealed class Dimmer : Actuator() {
         override val supportedOps: Map<String, Int> get() = DIMMER_OPS
     }
 
     @Serializable
-    sealed class Button() : Device() {
+    sealed class Button : Device() {
         override val supportedOps: Map<String, Int> get() = BUTTON_OPS
         override val attributes: Map<String, List<String>> get() = NO_ATTRIBUTES
     }
 
     @Serializable
-    sealed class Shade() : Device() {
+    sealed class Shade : Device() {
         override val supportedOps: Map<String, Int> get() = SHADE_OPS
         override val attributes: Map<String, List<String>> get() = NO_ATTRIBUTES
     }
 
     @Serializable
-    sealed class Sensor() : Device() {
+    sealed class Sensor : Device() {
         override val supportedOps: Map<String, Int> get() = NO_OPS
     }
 
     @Serializable
-    sealed class ContactSensor() : Sensor() {
+    sealed class ContactSensor : Sensor() {
         override val attributes: Map<String, List<String>> get() = CONTACT_ATTRIBUTES
     }
 

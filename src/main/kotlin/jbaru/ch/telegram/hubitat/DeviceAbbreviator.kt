@@ -102,7 +102,8 @@ class DeviceAbbreviator {
         for ((_, deviceAbbreviation) in this.deviceAbbreviationMap) {
             val currentAbbreviation = deviceAbbreviation.getAbbreviation()
             abbreviationMap.putIfAbsent(currentAbbreviation, mutableListOf())
-            abbreviationMap[currentAbbreviation]!!.add(deviceAbbreviation) // Assertion is necessary because it indicates a bag on previous line.
+            // The assertion is safe: putIfAbsent on the previous line guarantees the key.
+            abbreviationMap[currentAbbreviation]!!.add(deviceAbbreviation)
         }
         for ((_, collidingAbbreviation) in abbreviationMap) {
             if ((res.isEmpty() || collidingAbbreviation.size < res.size) && collidingAbbreviation.size > 1) {

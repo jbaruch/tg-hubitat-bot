@@ -1,26 +1,35 @@
 package jbaru.ch.telegram.hubitat
+import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.eq
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.any
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
+import io.kotest.property.arbitrary.string
 
-import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.entities.Message
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
-import io.kotest.property.arbitrary.*
+import io.kotest.property.PropTestConfig
 import io.kotest.property.checkAll
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.HttpStatusCode
 import jbaru.ch.telegram.hubitat.model.Device
-import org.mockito.kotlin.*
+
+// Property tests run with a FIXED seed: the exploration stays property-based
+// but the generated cases are deterministic and reproducible - no
+// self-generated randomness in CI, no jacoco coverage-gate flakiness.
+private const val FIXED_SEED = 20260722L
 
 class CommandHandlersPropertyTest : FunSpec({
     
     // **Feature: test-coverage-improvement, Property 1: Command parsing correctness**
     test("command parsing should correctly extract command, device name, and arguments").config(invocations = 100) {
-        val bot = mock<Bot>()
         val deviceManager = mock<DeviceManager>()
         val networkClient = mock<NetworkClient>()
         
-        checkAll(Arb.string(1..50)) { input ->
+        checkAll(PropTestConfig(seed = FIXED_SEED), Arb.string(1..50)) { input ->
             val parts = input.split(" ").filter { it.isNotEmpty() }
             if (parts.size >= 2) {
                 val command = parts[0].filter { it.isLetterOrDigit() || it == '_' }
@@ -41,7 +50,7 @@ class CommandHandlersPropertyTest : FunSpec({
                     }
                     
                     val result = CommandHandlers.handleDeviceCommand(
-                        bot, message, deviceManager, networkClient,
+                        message, deviceManager, networkClient,
                         "test-app", "test-token", "test-hub"
                     )
                     

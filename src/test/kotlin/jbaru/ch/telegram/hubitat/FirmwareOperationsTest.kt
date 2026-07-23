@@ -301,7 +301,10 @@ class FirmwareOperationsTest : FunSpec({
             whenever(networkClient.getBody(argThat { endsWith("/hub2/devicesList") }, any()))
                 .thenReturn(devicesListJson)
             whenever(networkClient.getBody(argThat { endsWith("/device/fullJson/725") }, any()))
-                .thenReturn("""{"device": {"data": {"deviceModel": "ZEN76", "firmwareVersion": "3.60", "manufacturer": "634", "deviceType": 28672, "deviceId": 40966}}}""")
+                .thenReturn(
+                    """{"device": {"data": {"deviceModel": "ZEN76", "firmwareVersion": "3.60",""" +
+                    """ "manufacturer": "634", "deviceType": 28672, "deviceId": 40966}}}"""
+                )
             whenever(networkClient.getBody(argThat { endsWith("/device/fullJson/39") }, any()))
                 .thenReturn("""{"device": {"data": {"zwNodeInfo": "53 BC"}}}""")
             whenever(networkClient.getBody(argThat { contains("deviceFirmware/details?nodeId=117") }, any()))
@@ -338,22 +341,39 @@ class FirmwareOperationsTest : FunSpec({
             val devices = FirmwareOperations.collectZwaveDevices(hub, networkClient)
 
             devices.size shouldBe 2
-            devices.first { it.name == "Left Shade" }.readError.shouldNotBeNull() shouldContain "deviceFirmware/details failed"
+            devices.first { it.name == "Left Shade" }
+                .readError.shouldNotBeNull() shouldContain "deviceFirmware/details failed"
         }
     }
 
     context("report formatting") {
         test("report groups findings by action and counts up-to-date only") {
             val findings = listOf(
-                FirmwareOperations.classify(device(name = "Fan", deviceModel = "ZEN76", firmwareVersion = "3.40"), testCatalog),
-                FirmwareOperations.classify(device(name = "Bath Light", deviceModel = "ZEN76", firmwareVersion = "3.30"), testCatalog),
-                FirmwareOperations.classify(device(name = "Closet", deviceModel = "ZEN76", firmwareVersion = "3.60"), testCatalog),
+                FirmwareOperations
+                    .classify(device(name = "Fan", deviceModel = "ZEN76", firmwareVersion = "3.40"), testCatalog),
                 FirmwareOperations.classify(
-                    device(name = "Front Lock", driverType = "Generic Z-Wave Lock", firmwareVersion = "1.01", manufacturer = 1106, deviceType = 4, productId = 1),
+                    device(name = "Bath Light", deviceModel = "ZEN76", firmwareVersion = "3.30"),
                     testCatalog
                 ),
-                FirmwareOperations.classify(device(name = "Shade", driverType = "Springs Window Fashions Roller Shade"), testCatalog),
-                FirmwareOperations.classify(device(name = "Mystery", deviceModel = "UNK00", firmwareVersion = "1.0"), testCatalog)
+                FirmwareOperations.classify(
+                    device(name = "Closet", deviceModel = "ZEN76", firmwareVersion = "3.60"),
+                    testCatalog
+                ),
+                FirmwareOperations.classify(
+                    device(
+                        name = "Front Lock", driverType = "Generic Z-Wave Lock", firmwareVersion = "1.01",
+                        manufacturer = 1106, deviceType = 4, productId = 1
+                    ),
+                    testCatalog
+                ),
+                FirmwareOperations.classify(
+                    device(name = "Shade", driverType = "Springs Window Fashions Roller Shade"),
+                    testCatalog
+                ),
+                FirmwareOperations.classify(
+                    device(name = "Mystery", deviceModel = "UNK00", firmwareVersion = "1.0"),
+                    testCatalog
+                )
             )
 
             val report = FirmwareOperations.formatReport(findings, testCatalog).joinToString("\n\n")
@@ -371,7 +391,8 @@ class FirmwareOperationsTest : FunSpec({
         }
 
         test("hub errors surface in the report") {
-            val report = FirmwareOperations.formatReport(emptyList(), testCatalog, listOf("Devices Hub: connect timeout"))
+            val report =
+                FirmwareOperations.formatReport(emptyList(), testCatalog, listOf("Devices Hub: connect timeout"))
                 .joinToString("\n\n")
             report shouldContain "could not be checked"
             report shouldContain "Devices Hub: connect timeout"
@@ -380,7 +401,10 @@ class FirmwareOperationsTest : FunSpec({
         test("oversized reports split into multiple messages under the Telegram cap") {
             val findings = (1..400).map {
                 FirmwareOperations.classify(
-                    device(name = "Device with a fairly long descriptive name $it", deviceModel = "ZEN76", firmwareVersion = "3.40"),
+                    device(
+                        name = "Device with a fairly long descriptive name $it",
+                        deviceModel = "ZEN76", firmwareVersion = "3.40"
+                    ),
                     testCatalog
                 )
             }

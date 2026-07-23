@@ -1,6 +1,5 @@
 package jbaru.ch.telegram.hubitat
 
-import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.Message
 import io.ktor.http.isSuccess
@@ -24,7 +23,6 @@ object CommandHandlers {
     private const val MAX_MESSAGE_LENGTH = 3900
 
     suspend fun handleDeviceCommand(
-        bot: Bot,
         message: Message,
         deviceManager: DeviceManager,
         networkClient: NetworkClient,

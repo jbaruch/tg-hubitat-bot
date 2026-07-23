@@ -1,18 +1,27 @@
 package jbaru.ch.telegram.hubitat.integration
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonPrimitive
+import io.ktor.utils.io.close
+import jbaru.ch.telegram.hubitat.DeviceManager
+import jbaru.ch.telegram.hubitat.HubOperations
+import jbaru.ch.telegram.hubitat.KtorNetworkClient
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.http.headersOf
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.HttpClient
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldNotBeEmpty
 import io.kotest.matchers.string.shouldContain
-import io.ktor.client.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.engine.mock.*
-import io.ktor.http.*
-import io.ktor.utils.io.*
-import jbaru.ch.telegram.hubitat.*
 import jbaru.ch.telegram.hubitat.model.Device
-import kotlinx.serialization.json.*
 
 /**
  * Real integration test that hits actual Hubitat APIs.
@@ -24,7 +33,8 @@ import kotlinx.serialization.json.*
  * - HUB_INFO_DEVICE_ID: Device ID of the Hub Information Driver v3 device (optional for device discovery test)
  * 
  * To run: 
- * DEFAULT_HUB_IP=hubitat.local MAKER_API_APP_ID=xxx MAKER_API_TOKEN=xxx HUB_INFO_DEVICE_ID=123 ./gradlew test --tests "*RealHubitatApiTest*"
+ * DEFAULT_HUB_IP=hubitat.local MAKER_API_APP_ID=xxx MAKER_API_TOKEN=xxx HUB_INFO_DEVICE_ID=123 \
+ *   ./gradlew test --tests "*RealHubitatApiTest*"
  */
 class RealHubitatApiTest : FunSpec({
     
@@ -37,7 +47,7 @@ class RealHubitatApiTest : FunSpec({
     println("DEFAULT_HUB_IP: ${if (hubIp != null) hubIp else "NOT SET"}")
     println("MAKER_API_APP_ID: ${if (makerApiAppId != null) makerApiAppId else "NOT SET"}")
     println("MAKER_API_TOKEN: ${if (makerApiToken != null) "***" else "NOT SET"}")
-    println("HUB_INFO_DEVICE_ID: ${if (hubInfoDeviceId != null) hubInfoDeviceId else "NOT SET (optional for discovery)"}")
+    println("HUB_INFO_DEVICE_ID: ${hubInfoDeviceId ?: "NOT SET (optional for discovery)"}")
     println("========================================")
     
     // Device discovery test only needs hub IP, app ID, and token
@@ -87,7 +97,8 @@ class RealHubitatApiTest : FunSpec({
         }
     }
     
-    test("should list all devices from real Maker API and find Hub Information Drivers").config(enabled = discoveryEnabled) {
+    test("should list all devices from real Maker API and find Hub Information Drivers")
+        .config(enabled = discoveryEnabled) {
         val client = HttpClient(CIO)
         val networkClient = KtorNetworkClient(client)
         
@@ -243,7 +254,10 @@ class RealHubitatApiTest : FunSpec({
             } else {
                 // Third call succeeds
                 respond(
-                    content = ByteReadChannel("""{"attributes":[{"name":"firmwareVersionString","currentValue":"2.4.3.172"},{"name":"hubUpdateVersion","currentValue":"2.4.3.172"}]}"""),
+                    content = ByteReadChannel(
+                        """{"attributes":[{"name":"firmwareVersionString","currentValue":"2.4.3.172"},""" +
+                        """{"name":"hubUpdateVersion","currentValue":"2.4.3.172"}]}"""
+                    ),
                     status = HttpStatusCode.OK,
                     headers = headersOf(HttpHeaders.ContentType, "application/json")
                 )

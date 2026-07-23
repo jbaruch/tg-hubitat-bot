@@ -34,6 +34,10 @@ data class UpdateProgress(
 
 object HubOperations {
 
+    // Anything shorter cannot be a real hub-info JSON payload - it is a hub
+    // mid-restart answering with a stub.
+    private const val MIN_PLAUSIBLE_RESPONSE_LENGTH = 10
+
     private val logger = LoggerFactory.getLogger(HubOperations::class.java)
 
     suspend fun initializeHubs(
@@ -63,7 +67,9 @@ object HubOperations {
                     ?.jsonObject?.get("currentValue")?.jsonPrimitive?.content
 
                 if (ip.isNullOrBlank()) {
-                    logger.warn("Skipping hub '${hub.label}' (id=${hub.id}): no localIP attribute exposed via Maker API")
+                    logger.warn(
+                        "Skipping hub '${hub.label}' (id=${hub.id}): no localIP attribute exposed via Maker API"
+                    )
                     continue
                 }
 
@@ -71,7 +77,8 @@ object HubOperations {
                 hub.managementToken = networkClient.getBody("http://${ip}/hub/advanced/getManagementToken")
                 initialized.add(hub)
             } catch (e: Exception) {
-                logger.warn("Skipping hub '${hub.label}' (id=${hub.id}): ${KtorNetworkClient.redactSecrets(e.message?.substringBefore('\n'))}")
+                val reason = KtorNetworkClient.redactSecrets(e.message?.substringBefore('\n'))
+                logger.warn("Skipping hub '${hub.label}' (id=${hub.id}): $reason")
             }
         }
         return initialized
@@ -96,7 +103,7 @@ object HubOperations {
             )
         }
         
-        if (responseBody.length < 10) {
+        if (responseBody.length < MIN_PLAUSIBLE_RESPONSE_LENGTH) {
             throw Exception(
                 "Failed to get hub info for hub '${hub.label}' from endpoint '$endpoint': " +
                 "Received incomplete response (${responseBody.length} chars): '$responseBody'. " +
@@ -205,7 +212,9 @@ object HubOperations {
                     mapOf("token" to hub.managementToken)
                 )
                 if (response.status != HttpStatusCode.OK) {
-                    return Result.failure(Exception("Failed to initiate update for hub ${hub.label}: ${response.status}"))
+                    return Result.failure(
+                        Exception("Failed to initiate update for hub ${hub.label}: ${response.status}")
+                    )
                 }
                 progressCallback("Update initiated for hub ${hub.label}")
             } catch (e: Exception) {
@@ -257,7 +266,10 @@ object HubOperations {
             )
 
             if (!currentProgress.isComplete) {
-                progressCallback("Progress: ${currentProgress.successCount}/${currentProgress.totalHubs} updated, ${currentProgress.inProgressHubs.size} still updating")
+                progressCallback(
+                    "Progress: ${currentProgress.successCount}/${currentProgress.totalHubs} updated, " +
+                        "${currentProgress.inProgressHubs.size} still updating"
+                )
             }
         }
         

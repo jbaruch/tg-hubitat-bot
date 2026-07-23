@@ -1,4 +1,14 @@
 package jbaru.ch.telegram.hubitat.integration
+import jbaru.ch.telegram.hubitat.DeviceManager
+import jbaru.ch.telegram.hubitat.CommandHandlers
+import jbaru.ch.telegram.hubitat.KtorNetworkClient
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
+import io.ktor.http.HttpHeaders
+import io.ktor.client.engine.mock.respond
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.HttpClient
 
 import com.github.kotlintelegrambot.entities.Chat
 import com.github.kotlintelegrambot.entities.Message
@@ -7,12 +17,6 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
-import io.ktor.client.*
-import io.ktor.client.engine.mock.*
-import io.ktor.http.*
-import io.ktor.utils.io.*
-import jbaru.ch.telegram.hubitat.*
-import org.mockito.kotlin.mock
 
 /**
  * Integration test for command flow from message to response.
@@ -60,7 +64,6 @@ class CommandFlowIntegrationTest : FunSpec({
         val networkClient = KtorNetworkClient(client)
         val deviceManager = DeviceManager(devicesJson)
         
-        val bot = mock<com.github.kotlintelegrambot.Bot>()
         val message = Message(
             messageId = 1,
             date = 0,
@@ -69,7 +72,6 @@ class CommandFlowIntegrationTest : FunSpec({
         )
         
         val result = CommandHandlers.handleDeviceCommand(
-            bot = bot,
             message = message,
             deviceManager = deviceManager,
             networkClient = networkClient,
@@ -97,7 +99,6 @@ class CommandFlowIntegrationTest : FunSpec({
         val networkClient = KtorNetworkClient(client)
         val deviceManager = DeviceManager(devicesJson)
 
-        val bot = mock<com.github.kotlintelegrambot.Bot>()
         val message = Message(
             messageId = 1,
             date = 0,
@@ -106,7 +107,6 @@ class CommandFlowIntegrationTest : FunSpec({
         )
 
         val result = CommandHandlers.handleDeviceCommand(
-            bot = bot,
             message = message,
             deviceManager = deviceManager,
             networkClient = networkClient,
@@ -131,7 +131,6 @@ class CommandFlowIntegrationTest : FunSpec({
         val networkClient = KtorNetworkClient(client)
         val deviceManager = DeviceManager(devicesJson)
         
-        val bot = mock<com.github.kotlintelegrambot.Bot>()
         val message = Message(
             messageId = 1,
             date = 0,
@@ -140,7 +139,6 @@ class CommandFlowIntegrationTest : FunSpec({
         )
         
         val result = CommandHandlers.handleDeviceCommand(
-            bot = bot,
             message = message,
             deviceManager = deviceManager,
             networkClient = networkClient,

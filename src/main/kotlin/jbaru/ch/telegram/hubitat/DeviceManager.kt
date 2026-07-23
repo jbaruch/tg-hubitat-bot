@@ -81,7 +81,9 @@ class DeviceManager(deviceListJson: String) {
             return if (device.supportedOps.containsKey(command)) {
                 Result.success(device)
             } else {
-                Result.failure(IllegalArgumentException("Command '$command' is not supported by device '${device.label}'"))
+                Result.failure(
+                    IllegalArgumentException("Command '$command' is not supported by device '${device.label}'")
+                )
             }
         }
 
@@ -113,9 +115,9 @@ class DeviceManager(deviceListJson: String) {
         // Build the table string
         val tableBuilder = StringBuilder()
         tableBuilder.appendLine("```")
-        tableBuilder.appendLine("+" + "-".repeat(maxDeviceNameLength + 2) + "+" + "-".repeat(maxAliasesLength + 2) + "+")
+        tableBuilder.appendLine(tableBorder(maxDeviceNameLength, maxAliasesLength))
         tableBuilder.appendLine("| ${"Device".padEnd(maxDeviceNameLength)} | ${"Aliases".padEnd(maxAliasesLength)} |")
-        tableBuilder.appendLine("+" + "-".repeat(maxDeviceNameLength + 2) + "+" + "-".repeat(maxAliasesLength + 2) + "+")
+        tableBuilder.appendLine(tableBorder(maxDeviceNameLength, maxAliasesLength))
 
         deviceToAliases.forEach { (device, aliases) ->
             val aliasesString = aliases.joinToString(", ")
@@ -128,7 +130,7 @@ class DeviceManager(deviceListJson: String) {
             )
         }
 
-        tableBuilder.appendLine("+" + "-".repeat(maxDeviceNameLength + 2) + "+" + "-".repeat(maxAliasesLength + 2) + "+")
+        tableBuilder.appendLine(tableBorder(maxDeviceNameLength, maxAliasesLength))
 
         tableBuilder.appendLine("```")
         return tableBuilder.toString()
@@ -168,16 +170,19 @@ class DeviceManager(deviceListJson: String) {
 
             buildString {
                 appendLine("```")
-                appendLine("+" + "-".repeat(maxDeviceNameLength + 2) + "+" + "-".repeat(maxAliasesLength + 2) + "+")
+                appendLine(tableBorder(maxDeviceNameLength, maxAliasesLength))
                 appendLine("| ${"Device".padEnd(maxDeviceNameLength)} | ${"Aliases".padEnd(maxAliasesLength)} |")
-                appendLine("+" + "-".repeat(maxDeviceNameLength + 2) + "+" + "-".repeat(maxAliasesLength + 2) + "+")
+                appendLine(tableBorder(maxDeviceNameLength, maxAliasesLength))
 
                 deviceToAliases.forEach { (device, aliases) ->
                     val aliasesString = aliases.joinToString(", ")
-                    appendLine("| ${escapeMarkdownCode(device.label).padEnd(maxDeviceNameLength)} | ${aliasesString.padEnd(maxAliasesLength)} |")
+                    appendLine(
+                        "| ${escapeMarkdownCode(device.label).padEnd(maxDeviceNameLength)} | " +
+                            "${aliasesString.padEnd(maxAliasesLength)} |"
+                    )
                 }
 
-                appendLine("+" + "-".repeat(maxDeviceNameLength + 2) + "+" + "-".repeat(maxAliasesLength + 2) + "+")
+                appendLine(tableBorder(maxDeviceNameLength, maxAliasesLength))
                 appendLine("```")
             }
         }
@@ -231,6 +236,9 @@ class DeviceManager(deviceListJson: String) {
     // The /list tables render inside MarkdownV2 code fences, where every
     // character is literal EXCEPT backslash and backtick - those two are the
     // only ones that can break the fence and fail the whole sendMessage.
+    private fun tableBorder(nameWidth: Int, aliasWidth: Int): String =
+        "+" + "-".repeat(nameWidth + 2) + "+" + "-".repeat(aliasWidth + 2) + "+"
+
     private fun escapeMarkdownCode(s: String): String =
         s.replace("\\", "\\\\").replace("`", "\\`")
 

@@ -216,12 +216,12 @@ tasks.named("jibBuildTar") {
 }
 
 
-// Static-analysis gate. detekt 2.0.0-alpha.5 supports the JVM 25 toolchain
-// (1.23.x caps at jvmTarget 22). A committed baseline snapshots the findings
-// present at adoption so CI blocks only NEW violations; burn the baseline down
-// to clear existing debt (see config/detekt/baseline.xml).
+// Static-analysis tooling. detekt 2.0.0-alpha.5 supports the JVM 25 toolchain
+// (1.23.x caps at jvmTarget 22). Run on demand with `./gradlew detekt`.
+// No CI gate yet: per language-diagnostics "Adopting on a Dirty Tree", the gate
+// is wired only once the tree reports zero findings — fixes land first, in
+// separate PRs, then a final PR adds the CI step.
 detekt {
     buildUponDefaultConfig = true
     config.setFrom(files("config/detekt/detekt.yml"))
-    baseline = file("config/detekt/baseline.xml")
 }

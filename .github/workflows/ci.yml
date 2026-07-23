@@ -31,10 +31,5 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # Static-analysis gate first (fast, fails cheap) — enforces zero NEW
-      # detekt findings; existing debt is snapshotted in config/detekt/baseline.xml.
-      - name: Static analysis (detekt)
-        run: ./gradlew --no-daemon detekt
-
       - name: Run build and tests
         run: ./gradlew --no-daemon clean build test

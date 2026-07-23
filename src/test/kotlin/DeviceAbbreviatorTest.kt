@@ -121,6 +121,29 @@ class DeviceAbbreviatorTest {
         }
 
         @Test
+        fun `test exhausted first token position does not doom a group a later token can diverge`() {
+            // After "az" forces "ab" to full expansion, the colliding group
+            // {a b, a bx, a by, ab} differs at token 0 - but every token-0
+            // abbreviation is already fully expanded there. Expansion must move
+            // on to token 1, where "bx"/"by" can still diverge; only the truly
+            // irreconcilable pair ("a b" vs "ab") may be dropped.
+            val abbr = DeviceAbbreviator()
+            abbr.addName("a b")
+            abbr.addName("a bx")
+            abbr.addName("a by")
+            abbr.addName("ab")
+            abbr.addName("az")
+
+            abbr.abbreviate()
+
+            assertEquals("abx", abbr.getAbbreviation("a bx").getOrThrow())
+            assertEquals("aby", abbr.getAbbreviation("a by").getOrThrow())
+            assertEquals("az", abbr.getAbbreviation("az").getOrThrow())
+            assertTrue(abbr.getAbbreviation("a b").isFailure)
+            assertTrue(abbr.getAbbreviation("ab").isFailure)
+        }
+
+        @Test
         fun `test stuck group does not block other collisions from resolving`() {
             val stuck = DeviceAbbreviator()
             stuck.addName("a b")

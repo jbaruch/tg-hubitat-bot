@@ -1,5 +1,16 @@
 # Changes Log
 
+## More Abbreviations Survive Dense Name Collisions
+
+### Overview
+Abbreviation resolution no longer gives up on a collision group when the first differing word is exhausted but a later word can still make the names unique.
+
+### Changes Made
+- Collision expansion scans past word positions that are already fully expanded and only declares a group unabbreviatable when no position anywhere can grow
+
+### Benefits
+- Fewer devices lose their short abbreviation in setups with many similar names
+
 ## /set_level for Dimmable Devices; README Stops Advertising Unimplemented Commands
 
 ### Overview

@@ -21,11 +21,13 @@ class DeviceAbbreviator {
             return tokens[i]
         }
 
-        fun expandTokenAbbreviationAt(i: Int) {
+        /** @return true if the abbreviation actually grew, false if the token was already fully expanded. */
+        fun expandTokenAbbreviationAt(i: Int): Boolean {
             val token = tokens[i]
             val abbreviation = tokenAbbreviations[i]
-            if (abbreviation.length == token.length) return
+            if (abbreviation.length == token.length) return false
             abbreviation.append(token[abbreviation.length])
+            return true
         }
 
         fun getAbbreviation(): String {
@@ -77,10 +79,18 @@ class DeviceAbbreviator {
                 else uniqueTokens.add("")
             }
             if (uniqueTokens.size > 1) {
+                var progressed = false
                 for (deviceAbbreviation in collision) {
-                    if (i < deviceAbbreviation.numberOfTokens) deviceAbbreviation.expandTokenAbbreviationAt(i)
+                    if (i < deviceAbbreviation.numberOfTokens) {
+                        progressed = deviceAbbreviation.expandTokenAbbreviationAt(i) || progressed
+                    }
                 }
-                break
+                // Only stop once something actually grew: a position whose
+                // differing tokens are all fully expanded is exhausted, and a
+                // LATER position may still be able to diverge the group. Without
+                // this, abbreviate()'s no-progress check would wrongly declare
+                // the group unabbreviatable.
+                if (progressed) break
             }
         }
     }

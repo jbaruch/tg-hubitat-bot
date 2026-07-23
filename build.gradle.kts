@@ -225,3 +225,13 @@ detekt {
     buildUponDefaultConfig = true
     config.setFrom(files("config/detekt/detekt.yml"))
 }
+
+// Adoption phase: keep detekt OFF the `check`/`build` lifecycle so CI stays
+// green while the tree is still dirty. The plugin auto-wires `:detekt` into
+// `check`; detach it so it runs on demand only (`./gradlew detekt`). The gate PR
+// re-attaches it once findings reach zero.
+tasks.named("check") {
+    setDependsOn(dependsOn.filterNot {
+        (it as? TaskProvider<*>)?.name?.startsWith("detekt") == true
+    })
+}

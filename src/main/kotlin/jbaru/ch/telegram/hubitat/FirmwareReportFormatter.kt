@@ -140,12 +140,17 @@ internal object FirmwareReportFormatter {
         val pieces = mutableListOf<String>()
         val current = StringBuilder()
         for (lineText in section.lineSequence()) {
-            if (current.isNotEmpty() && current.length + lineText.length + 1 > MAX_MESSAGE_LENGTH) {
-                pieces.add(current.toString().trimEnd())
-                current.clear()
+            // A single line beyond the cap (a pathological device name) gets
+            // hard-chunked - it must never pass through oversized.
+            val chunks = lineText.chunked(MAX_MESSAGE_LENGTH)
+            for (chunk in chunks) {
+                if (current.isNotEmpty() && current.length + chunk.length + 1 > MAX_MESSAGE_LENGTH) {
+                    pieces.add(current.toString().trimEnd())
+                    current.clear()
+                }
+                if (current.isNotEmpty()) current.append("\n")
+                current.append(chunk)
             }
-            if (current.isNotEmpty()) current.append("\n")
-            current.append(lineText)
         }
         if (current.isNotEmpty()) pieces.add(current.toString().trimEnd())
         return pieces

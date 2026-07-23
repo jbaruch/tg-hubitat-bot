@@ -68,7 +68,7 @@ object FirmwareOperations {
     fun loadCatalog(): FirmwareCatalog {
         val resource = FirmwareOperations::class.java.getResourceAsStream(CATALOG_RESOURCE)
             ?: throw IllegalStateException("Firmware catalog resource $CATALOG_RESOURCE not found")
-        return json.decodeFromString<FirmwareCatalog>(resource.bufferedReader().readText())
+        return json.decodeFromString<FirmwareCatalog>(resource.bufferedReader().use { it.readText() })
     }
 
     /**

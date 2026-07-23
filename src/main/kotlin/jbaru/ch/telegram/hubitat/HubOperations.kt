@@ -1,7 +1,7 @@
 package jbaru.ch.telegram.hubitat
 
 import io.ktor.http.HttpStatusCode
-import java.util.concurrent.CancellationException
+import kotlinx.coroutines.CancellationException
 import jbaru.ch.telegram.hubitat.model.Device
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json

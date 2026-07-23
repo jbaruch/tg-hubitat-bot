@@ -15,7 +15,7 @@ import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import io.ktor.http.HttpStatusCode
-import java.util.concurrent.CancellationException
+import kotlinx.coroutines.CancellationException
 import jbaru.ch.telegram.hubitat.model.Device
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json

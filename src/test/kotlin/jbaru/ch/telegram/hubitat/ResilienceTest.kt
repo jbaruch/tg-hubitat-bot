@@ -4,7 +4,7 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import java.io.IOException
-import java.util.concurrent.CancellationException
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerializationException
 
 class ResilienceTest : FunSpec({

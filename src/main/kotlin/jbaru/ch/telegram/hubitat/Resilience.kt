@@ -1,7 +1,7 @@
 package jbaru.ch.telegram.hubitat
 
 import java.io.IOException
-import java.util.concurrent.CancellationException
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerializationException
 
 /**

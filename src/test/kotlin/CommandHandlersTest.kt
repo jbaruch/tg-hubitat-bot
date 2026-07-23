@@ -152,6 +152,30 @@ class CommandHandlersTest : FunSpec({
             result shouldBe "Done: Button → push 1"
         }
 
+        test("should execute set_level on a dimmer") {
+            val message = mock<Message> {
+                on { text } doReturn "/set_level kitchen 50"
+            }
+            val device = Device.RoomLightsActivatorDimmer(5, "Kitchen Lights")
+            whenever(deviceManager.findDevice(any(), any()))
+                .thenReturn(Result.failure(Exception("No device found for query: probe")))
+            whenever(deviceManager.findDevice(eq("kitchen"), eq("setLevel")))
+                .thenReturn(Result.success(device))
+
+            val mockResponse = mock<HttpResponse> {
+                on { status } doReturn HttpStatusCode.OK
+            }
+            whenever(networkClient.get(argThat { contains("/devices/5/setLevel/50") }, any()))
+                .thenReturn(mockResponse)
+
+            val result = CommandHandlers.handleDeviceCommand(
+                bot, message, deviceManager, networkClient,
+                makerApiAppId, makerApiToken, defaultHubIp
+            )
+
+            result shouldBe "Done: Kitchen Lights → set_level 50"
+        }
+
         test("should report failure when the hub returns a non-2xx status") {
             val message = mock<Message> {
                 on { text } doReturn "/on kitchen_light"

@@ -11,6 +11,18 @@ Abbreviation resolution no longer gives up on a collision group when the first d
 ### Benefits
 - Fewer devices lose their short abbreviation in setups with many similar names
 
+## /set_level for Dimmable Devices; README Stops Advertising Unimplemented Commands
+
+### Overview
+/set_level now actually works on dimmers and bulbs; the README no longer lists commands that never existed.
+
+### Changes Made
+- New Dimmer device family (Room Lights Activator Dimmer/Bulb, Zooz dimmers) supporting on/off/setLevel - "/set_level Kitchen Lights 50" works end to end
+- /set_color and /set_color_temperature removed from the README: no color-capable device type exists
+
+### Benefits
+- Documented commands and implemented commands are the same set again
+
 ## Boot No Longer Hangs on Irreconcilable Device-Name Abbreviations
 
 ### Overview

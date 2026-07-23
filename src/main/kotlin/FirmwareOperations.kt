@@ -6,12 +6,14 @@ import jbaru.ch.telegram.hubitat.model.FirmwareCatalog
 import jbaru.ch.telegram.hubitat.model.FirmwareLine
 import jbaru.ch.telegram.hubitat.model.firmwareMajor
 import jbaru.ch.telegram.hubitat.model.parseFirmwareVersion
+import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -137,21 +139,30 @@ object FirmwareOperations {
                             // Never swallow structured-concurrency cancellation.
                             throw e
                         }
-                        // outer-boundary-process-contract: per-device fan-out
-                        // boundary. Silent-failure shape: one unreadable
-                        // device aborting the whole /firmware report.
-                        // Emitted response: the device is reported with its
-                        // readError in the UNREADABLE section; the exception
-                        // is logged here. Propagation would trade the whole
-                        // report for one flaky device.
-                        catch (e: Exception) {
-                            logger.warn("Failed to read firmware info for '{}' on {}: {}", base.name, hub.label, e.message)
-                            base.copy(readError = e.message ?: e.toString())
+                        // The expected per-device failures - network (timeouts
+                        // included: ktor's HttpRequestTimeoutException is an
+                        // IOException), the explicit IllegalStateExceptions from
+                        // readDeviceFirmware's error paths, and malformed JSON -
+                        // mark the device unreadable instead of aborting the
+                        // whole report.
+                        catch (e: IOException) {
+                            unreadable(base, hub, e)
+                        } catch (e: IllegalStateException) {
+                            unreadable(base, hub, e)
+                        } catch (e: SerializationException) {
+                            unreadable(base, hub, e)
+                        } catch (e: IllegalArgumentException) {
+                            unreadable(base, hub, e)
                         }
                     }
                 }
             }.awaitAll()
         }
+    }
+
+    private fun unreadable(base: ZwaveDeviceInfo, hub: Device.Hub, e: Exception): ZwaveDeviceInfo {
+        logger.warn("Failed to read firmware info for '{}' on {}: {}", base.name, hub.label, e.message)
+        return base.copy(readError = e.message ?: e.toString())
     }
 
     private suspend fun readDeviceFirmware(

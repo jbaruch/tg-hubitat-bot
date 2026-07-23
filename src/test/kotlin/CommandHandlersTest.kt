@@ -456,7 +456,7 @@ class CommandHandlersTest : FunSpec({
             whenever(networkClient.getBody(argThat { contains("/devices/1/attribute/contact") }, any()))
                 .thenReturn("""{"value": "open"}""")
             whenever(networkClient.getBody(argThat { contains("/devices/2/attribute/contact") }, any()))
-                .thenThrow(RuntimeException("hub timeout"))
+                .thenThrow(IllegalStateException("Hub request failed: HTTP 503"))
 
             val result = CommandHandlers.handleGetOpenSensorsCommand(
                 deviceManager, networkClient,

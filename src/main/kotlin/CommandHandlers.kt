@@ -5,12 +5,14 @@ import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.Message
 import io.ktor.http.isSuccess
 import jbaru.ch.telegram.hubitat.model.Device
+import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -143,16 +145,19 @@ object CommandHandlers {
                             // Never swallow structured-concurrency cancellation.
                             throw e
                         }
-                        // outer-boundary-process-contract: per-sensor fan-out
-                        // boundary. Silent-failure shape: one unreachable
-                        // sensor aborting the whole /get_open_sensors report.
-                        // Emitted response: the sensor is listed under
-                        // "Could not read" in the reply; the exception is
-                        // logged here. Propagation would trade the whole
-                        // report for one flaky sensor.
-                        catch (e: Exception) {
-                            logger.warn("Could not read contact state of '{}': {}", sensor.label, e.message)
-                            sensor to null
+                        // The expected per-sensor failures - network (timeouts
+                        // included: ktor's HttpRequestTimeoutException is an
+                        // IOException), a non-2xx from getBody, and malformed
+                        // JSON - mark the sensor "Could not read" instead of
+                        // aborting the whole report.
+                        catch (e: IOException) {
+                            logUnreadableSensor(sensor.label, e); sensor to null
+                        } catch (e: IllegalStateException) {
+                            logUnreadableSensor(sensor.label, e); sensor to null
+                        } catch (e: SerializationException) {
+                            logUnreadableSensor(sensor.label, e); sensor to null
+                        } catch (e: IllegalArgumentException) {
+                            logUnreadableSensor(sensor.label, e); sensor to null
                         }
                     }
                 }
@@ -241,6 +246,10 @@ object CommandHandlers {
         )
     }
     
+    private fun logUnreadableSensor(label: String, e: Exception) {
+        logger.warn("Could not read contact state of '{}': {}", label, e.message)
+    }
+
     private suspend fun runDeviceCommand(
         device: Device,
         command: String,

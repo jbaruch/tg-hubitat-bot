@@ -186,7 +186,7 @@ class HubOperationsTest : FunSpec({
             val hub = Device.Hub(1, "Hub 1", "token1", "192.168.1.100")
             
             whenever(networkClient.get(any(), any()))
-                .thenThrow(RuntimeException("Network error"))
+                .thenThrow(IllegalStateException("Network error"))
             
             val result = HubOperations.updateHubs(listOf(hub), networkClient)
             
@@ -261,12 +261,12 @@ class HubOperationsTest : FunSpec({
             val hub = Device.Hub(1, "Test Hub")
             
             whenever(networkClient.getBody(eq("http://hubitat.local/apps/api/test-app-id/devices/1"), any()))
-                .thenThrow(RuntimeException("Network error"))
+                .thenThrow(IllegalStateException("Network error"))
             
             try {
                 HubOperations.getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
                 throw AssertionError("Expected exception to be thrown")
-            } catch (e: RuntimeException) {
+            } catch (e: IllegalStateException) {
                 e.message shouldContain "Network error"
             }
         }
@@ -512,7 +512,7 @@ class HubOperationsTest : FunSpec({
             whenever(networkClient.getBody(eq("http://hubitat.local/apps/api/test-app-id/devices/1"), any()))
                 .thenReturn(needsUpdateResponse)
             whenever(networkClient.get(argThat { contains("/management/firmwareUpdate") }, any()))
-                .thenThrow(RuntimeException("connection refused"))
+                .thenThrow(IllegalStateException("connection refused"))
 
             val result = HubOperations.updateHubsWithPolling(
                 listOf(hub1),

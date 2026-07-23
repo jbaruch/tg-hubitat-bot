@@ -77,20 +77,18 @@ object FirmwareOperations {
      * bot redeploy. The bundled copy is the offline fallback, and the report
      * header says so when it is used.
      */
-    // Any failure here - network, HTTP, malformed JSON - must fall back to the
+    // An expected failure - network, HTTP, malformed JSON - falls back to the
     // bundled catalog rather than kill /firmware; the note in the report says so.
-    @Suppress("TooGenericExceptionCaught")
     suspend fun fetchCatalog(networkClient: NetworkClient): Pair<FirmwareCatalog, String?> =
-        try {
+        onExpectedFailure(
+            onFailure = { e ->
+                logger.warn("Could not fetch live firmware catalog, using bundled copy: {}", e.message)
+                loadCatalog() to "bundled fallback — live catalog unreachable"
+            }
+        ) {
             json.decodeFromString<FirmwareCatalog>(networkClient.getBody(CATALOG_URL)) to null
-        } catch (e: Exception) {
-            logger.warn("Could not fetch live firmware catalog, using bundled copy: {}", e.message)
-            loadCatalog() to "bundled fallback — live catalog unreachable"
         }
 
-    // Per-hub resilience: one unreachable hub becomes a report line, not a
-    // dead /firmware command - whatever it threw.
-    @Suppress("TooGenericExceptionCaught")
     suspend fun checkFirmware(
         hubs: List<Device.Hub>,
         networkClient: NetworkClient
@@ -99,13 +97,17 @@ object FirmwareOperations {
         val findings = mutableListOf<FirmwareFinding>()
         val hubErrors = mutableListOf<String>()
 
+        // Per-hub resilience: one unreachable hub becomes a report line, not a
+        // dead /firmware command.
         for (hub in hubs.filter { it.ip.isNotBlank() }) {
-            try {
+            onExpectedFailure(
+                onFailure = { e ->
+                    logger.error("Failed to collect Z-Wave devices from hub ${hub.label}", e)
+                    hubErrors.add("${hub.label}: ${KtorNetworkClient.redactSecrets(e.message ?: e.toString())}")
+                }
+            ) {
                 val devices = collectZwaveDevices(hub, networkClient)
                 findings.addAll(devices.map { classify(it, catalog) })
-            } catch (e: Exception) {
-                logger.error("Failed to collect Z-Wave devices from hub ${hub.label}", e)
-                hubErrors.add("${hub.label}: ${e.message ?: e.toString()}")
             }
         }
 

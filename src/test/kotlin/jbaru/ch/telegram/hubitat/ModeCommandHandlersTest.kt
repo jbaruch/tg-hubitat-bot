@@ -41,7 +41,7 @@ class ModeCommandHandlersTest : FunSpec({
         
         test("should return error message on failure") {
             whenever(networkClient.getBody(any(), any()))
-                .thenThrow(RuntimeException("Connection failed"))
+                .thenThrow(IllegalStateException("Connection failed"))
             
             val result = CommandHandlers.handleGetModeCommand(
                 networkClient, makerApiAppId, makerApiToken, hubIp
@@ -76,7 +76,7 @@ class ModeCommandHandlersTest : FunSpec({
         
         test("should return error message on failure") {
             whenever(networkClient.getBody(any(), any()))
-                .thenThrow(RuntimeException("Network error"))
+                .thenThrow(IllegalStateException("Network error"))
             
             val result = CommandHandlers.handleListModesCommand(
                 networkClient, makerApiAppId, makerApiToken, hubIp
@@ -168,7 +168,7 @@ class ModeCommandHandlersTest : FunSpec({
                 on { text } doReturn "/set_mode Away"
             }
 
-            whenever(networkClient.getBody(any(), any())).thenThrow(RuntimeException("Network boom"))
+            whenever(networkClient.getBody(any(), any())).thenThrow(IllegalStateException("Network boom"))
 
             val result = CommandHandlers.handleSetModeCommand(
                 message, networkClient, makerApiAppId, makerApiToken, hubIp

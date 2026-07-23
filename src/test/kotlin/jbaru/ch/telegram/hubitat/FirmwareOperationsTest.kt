@@ -269,7 +269,7 @@ class FirmwareOperationsTest : FunSpec({
 
         test("falls back to the bundled catalog when the live one is unreachable, and says so") {
             val networkClient = mock<NetworkClient>()
-            whenever(networkClient.getBody(any(), any())).thenThrow(RuntimeException("no route to host"))
+            whenever(networkClient.getBody(any(), any())).thenThrow(IllegalStateException("no route to host"))
 
             val (catalog, note) = FirmwareOperations.fetchCatalog(networkClient)
 

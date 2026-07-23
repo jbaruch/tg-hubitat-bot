@@ -42,9 +42,6 @@ object HubOperations {
 
     private val logger = LoggerFactory.getLogger(HubOperations::class.java)
 
-    // Per-hub resilience: a hub that cannot be initialized is skipped with a
-    // warning - whatever it threw - so one bad hub never blocks startup.
-    @Suppress("TooGenericExceptionCaught")
     suspend fun initializeHubs(
         deviceManager: DeviceManager,
         networkClient: NetworkClient,
@@ -58,8 +55,15 @@ object HubOperations {
         // since a hub without ip/managementToken can't be updated or rebooted.
         val hubs = deviceManager.findDevicesByType(Device.Hub::class.java)
         val initialized = mutableListOf<Device.Hub>()
+        // Per-hub resilience: a hub that cannot be initialized is skipped with
+        // a warning, so one bad hub never blocks startup.
         for (hub in hubs) {
-            try {
+            onExpectedFailure(
+                onFailure = { e ->
+                    val reason = KtorNetworkClient.redactSecrets(e.message?.substringBefore('\n'))
+                    logger.warn("Skipping hub '${hub.label}' (id=${hub.id}): $reason")
+                }
+            ) {
                 val json = Json.parseToJsonElement(
                     networkClient.getBody(
                         "http://${hubIp}/apps/api/${makerApiAppId}/devices/${hub.id}",
@@ -81,9 +85,6 @@ object HubOperations {
                 hub.ip = ip
                 hub.managementToken = networkClient.getBody("http://${ip}/hub/advanced/getManagementToken")
                 initialized.add(hub)
-            } catch (e: Exception) {
-                val reason = KtorNetworkClient.redactSecrets(e.message?.substringBefore('\n'))
-                logger.warn("Skipping hub '${hub.label}' (id=${hub.id}): $reason")
             }
         }
         return initialized
@@ -152,23 +153,20 @@ object HubOperations {
         )
     }
     
-    // Per-hub resilience: a failed request becomes a per-hub status line.
-    @Suppress("TooGenericExceptionCaught")
     suspend fun updateHubs(
         hubs: List<Device.Hub>,
         networkClient: NetworkClient
     ): Result<String> {
         val statusMap = mutableMapOf<String, HttpStatusCode>()
 
+        // Per-hub resilience: a failed request becomes a per-hub status line.
         for (hub in hubs) {
-            try {
+            onExpectedFailure(onFailure = { statusMap[hub.label] = HttpStatusCode.InternalServerError }) {
                 val response = networkClient.get(
                     "http://${hub.ip}/management/firmwareUpdate",
                     mapOf("token" to hub.managementToken)
                 )
                 statusMap[hub.label] = response.status
-            } catch (_: Exception) {
-                statusMap[hub.label] = HttpStatusCode.InternalServerError
             }
         }
         val failures = statusMap.filterValues { it != HttpStatusCode.OK }
@@ -186,10 +184,6 @@ object HubOperations {
         }
     }
     
-    // The poll loop treats ANY read failure as "hub still rebooting" by design
-    // (see pollForCompletion); narrowing the catches would turn expected reboot
-    // blips into failed updates.
-    @Suppress("TooGenericExceptionCaught")
     suspend fun updateHubsWithPolling(
         hubs: List<Device.Hub>,
         networkClient: NetworkClient,
@@ -200,10 +194,11 @@ object HubOperations {
         delayMillis: Long = 30000,
         progressCallback: suspend (String) -> Unit
     ): Result<String> {
+        // collectVersionInfo wraps every expected failure in IllegalStateException.
         val versionInfo = try {
             collectVersionInfo(hubs, networkClient, hubIp, makerApiAppId, makerApiToken)
-        } catch (e: Exception) {
-            return Result.failure(IllegalStateException(e.message, e))
+        } catch (e: IllegalStateException) {
+            return Result.failure(e)
         }
 
         // Skip hubs that are already up to date
@@ -225,7 +220,6 @@ object HubOperations {
         return summarize(finalProgress, progressCallback)
     }
 
-    @Suppress("TooGenericExceptionCaught")
     private suspend fun collectVersionInfo(
         hubs: List<Device.Hub>,
         networkClient: NetworkClient,
@@ -235,24 +229,33 @@ object HubOperations {
     ): Map<String, HubVersionInfo> {
         val versionInfo = mutableMapOf<String, HubVersionInfo>()
         for (hub in hubs) {
-            try {
+            onExpectedFailure(
+                onFailure = { e ->
+                    val reason = KtorNetworkClient.redactSecrets(e.message)
+                    throw IllegalStateException("Failed to get version info for hub ${hub.label}: $reason", e)
+                }
+            ) {
                 val (current, available) = getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
                 versionInfo[hub.label] = HubVersionInfo(hub.label, current, available)
-            } catch (e: Exception) {
-                throw IllegalStateException("Failed to get version info for hub ${hub.label}: ${e.message}", e)
             }
         }
         return versionInfo
     }
 
-    @Suppress("TooGenericExceptionCaught")
     private suspend fun initiateUpdates(
         hubs: List<Device.Hub>,
         networkClient: NetworkClient,
         progressCallback: suspend (String) -> Unit
     ): Result<Unit> {
         for (hub in hubs) {
-            try {
+            onExpectedFailure(
+                onFailure = { e ->
+                    val reason = KtorNetworkClient.redactSecrets(e.message)
+                    return Result.failure(
+                        IllegalStateException("Failed to initiate update for hub ${hub.label}: $reason", e)
+                    )
+                }
+            ) {
                 val response = networkClient.get(
                     "http://${hub.ip}/management/firmwareUpdate",
                     mapOf("token" to hub.managementToken)
@@ -263,10 +266,6 @@ object HubOperations {
                     )
                 }
                 progressCallback("Update initiated for hub ${hub.label}")
-            } catch (e: Exception) {
-                return Result.failure(
-                    IllegalStateException("Failed to initiate update for hub ${hub.label}: ${e.message}", e)
-                )
             }
         }
         return Result.success(Unit)
@@ -280,7 +279,6 @@ object HubOperations {
     // that genuinely never completes surfaces as the timeout in summarize; it
     // is never declared failed mid-flight on a transient reboot blip (which
     // used to end the whole watch early and mis-report a successful update).
-    @Suppress("TooGenericExceptionCaught")
     private suspend fun pollForCompletion(
         hubs: List<Device.Hub>,
         versionInfo: Map<String, HubVersionInfo>,
@@ -308,7 +306,13 @@ object HubOperations {
             val updatedHubs = mutableSetOf<String>()
             for (hubLabel in currentProgress.inProgressHubs) {
                 val hub = hubs.find { it.label == hubLabel } ?: continue
-                try {
+                onExpectedFailure(
+                    onFailure = {
+                        // Hub unreachable / empty response: it is rebooting to
+                        // apply the update. Keep waiting; do not mark it failed.
+                        progressCallback("Hub $hubLabel is applying the update (not reachable yet); still waiting")
+                    }
+                ) {
                     val (newCurrent, _) = getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
                     val originalVersion = versionInfo[hubLabel]!!.currentVersion
                     if (newCurrent != originalVersion) {
@@ -316,10 +320,6 @@ object HubOperations {
                         progressCallback("Hub $hubLabel updated from $originalVersion to $newCurrent")
                     }
                     // else: still on the old version - update still in progress, keep polling
-                } catch (_: Exception) {
-                    // Hub unreachable / empty response: it is rebooting to apply the
-                    // update. Keep waiting; do not mark it failed.
-                    progressCallback("Hub $hubLabel is applying the update (not reachable yet); still waiting")
                 }
             }
 

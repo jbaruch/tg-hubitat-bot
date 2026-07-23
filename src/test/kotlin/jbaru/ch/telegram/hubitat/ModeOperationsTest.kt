@@ -51,7 +51,7 @@ class ModeOperationsTest : FunSpec({
         
         test("should handle network errors") {
             whenever(networkClient.getBody(any(), any()))
-                .thenThrow(RuntimeException("Connection failed"))
+                .thenThrow(IllegalStateException("Connection failed"))
             
             val result = ModeOperations.getAllModes(
                 networkClient, makerApiAppId, makerApiToken, hubIp
@@ -116,7 +116,7 @@ class ModeOperationsTest : FunSpec({
         
         test("should propagate network errors") {
             whenever(networkClient.getBody(any(), any()))
-                .thenThrow(RuntimeException("Network error"))
+                .thenThrow(IllegalStateException("Network error"))
             
             val result = ModeOperations.getCurrentMode(
                 networkClient, makerApiAppId, makerApiToken, hubIp
@@ -205,7 +205,7 @@ class ModeOperationsTest : FunSpec({
             
             whenever(networkClient.getBody(any(), any())).thenReturn(modesJson)
             whenever(networkClient.get(any(), any()))
-                .thenThrow(RuntimeException("API error"))
+                .thenThrow(IllegalStateException("API error"))
             
             val result = ModeOperations.setMode(
                 networkClient, makerApiAppId, makerApiToken, hubIp, "Away"

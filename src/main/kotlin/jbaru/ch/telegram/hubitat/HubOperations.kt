@@ -2,6 +2,7 @@ package jbaru.ch.telegram.hubitat
 
 import io.ktor.http.HttpStatusCode
 import jbaru.ch.telegram.hubitat.model.Device
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonObject
@@ -37,9 +38,13 @@ object HubOperations {
     // Anything shorter cannot be a real hub-info JSON payload - it is a hub
     // mid-restart answering with a stub.
     private const val MIN_PLAUSIBLE_RESPONSE_LENGTH = 10
+    private const val PREVIEW_LENGTH = 200
 
     private val logger = LoggerFactory.getLogger(HubOperations::class.java)
 
+    // Per-hub resilience: a hub that cannot be initialized is skipped with a
+    // warning - whatever it threw - so one bad hub never blocks startup.
+    @Suppress("TooGenericExceptionCaught")
     suspend fun initializeHubs(
         deviceManager: DeviceManager,
         networkClient: NetworkClient,
@@ -84,6 +89,20 @@ object HubOperations {
         return initialized
     }
     
+    private fun validateHubInfoResponse(hub: Device.Hub, endpoint: String, responseBody: String) {
+        val problem = when {
+            responseBody.isBlank() ->
+                "Received empty response. This may happen if the hub is busy or restarting."
+            responseBody.length < MIN_PLAUSIBLE_RESPONSE_LENGTH ->
+                "Received incomplete response (${responseBody.length} chars): '$responseBody'. " +
+                    "This may happen if the hub is busy, restarting, or experiencing network issues."
+            else -> return
+        }
+        throw IllegalStateException(
+            "Failed to get hub info for hub '${hub.label}' from endpoint '$endpoint': $problem"
+        )
+    }
+
     suspend fun getHubVersions(
         hub: Device.Hub,
         networkClient: NetworkClient,
@@ -95,21 +114,7 @@ object HubOperations {
         val endpoint = "http://${hubIp}/apps/api/${makerApiAppId}/devices/${hub.id}"
         val responseBody = networkClient.getBody(endpoint, mapOf("access_token" to makerApiToken))
         
-        // Check for empty or very short response (likely incomplete)
-        if (responseBody.isBlank()) {
-            throw Exception(
-                "Failed to get hub info for hub '${hub.label}' from endpoint '$endpoint': " +
-                "Received empty response. This may happen if the hub is busy or restarting."
-            )
-        }
-        
-        if (responseBody.length < MIN_PLAUSIBLE_RESPONSE_LENGTH) {
-            throw Exception(
-                "Failed to get hub info for hub '${hub.label}' from endpoint '$endpoint': " +
-                "Received incomplete response (${responseBody.length} chars): '$responseBody'. " +
-                "This may happen if the hub is busy, restarting, or experiencing network issues."
-            )
-        }
+        validateHubInfoResponse(hub, endpoint, responseBody)
         
         try {
             val json = Json.parseToJsonElement(responseBody).jsonObject
@@ -125,16 +130,30 @@ object HubOperations {
             }?.jsonObject?.get("currentValue")?.jsonPrimitive?.content ?: ""
             
             return Pair(currentVersion, availableVersion)
-        } catch (e: Exception) {
-            val preview = if (responseBody.length > 200) responseBody.take(200) + "..." else responseBody
-            throw Exception(
-                "Failed to parse hub info response for hub '${hub.label}' from endpoint '$endpoint': ${e.message}\n" +
-                "Response preview: $preview",
-                e
-            )
+        } catch (e: SerializationException) {
+            throw hubInfoParseError(hub, endpoint, responseBody, e)
+        } catch (e: IllegalArgumentException) {
+            throw hubInfoParseError(hub, endpoint, responseBody, e)
         }
     }
+
+    private fun hubInfoParseError(
+        hub: Device.Hub,
+        endpoint: String,
+        responseBody: String,
+        e: Exception
+    ): IllegalStateException {
+        val preview =
+            if (responseBody.length > PREVIEW_LENGTH) responseBody.take(PREVIEW_LENGTH) + "..." else responseBody
+        return IllegalStateException(
+                "Failed to parse hub info response for hub '${hub.label}' from endpoint '$endpoint': ${e.message}\n" +
+                    "Response preview: $preview",
+            e
+        )
+    }
     
+    // Per-hub resilience: a failed request becomes a per-hub status line.
+    @Suppress("TooGenericExceptionCaught")
     suspend fun updateHubs(
         hubs: List<Device.Hub>,
         networkClient: NetworkClient
@@ -167,6 +186,10 @@ object HubOperations {
         }
     }
     
+    // The poll loop treats ANY read failure as "hub still rebooting" by design
+    // (see the comment inside); narrowing the catch would turn expected reboot
+    // blips into failed updates.
+    @Suppress("TooGenericExceptionCaught")
     suspend fun updateHubsWithPolling(
         hubs: List<Device.Hub>,
         networkClient: NetworkClient,

@@ -49,6 +49,10 @@ private lateinit var deviceManager: DeviceManager
 // Resolved via getMe() at startup; used to validate /cmd@BotName mentions.
 @Volatile private var botUsername: String? = null
 
+// The /firmware and /list handlers hold dispatcher-boundary catch-alls (they
+// send multiple messages, so they cannot use replyTo); same outer-boundary
+// contract as replyTo below.
+@Suppress("TooGenericExceptionCaught")
 fun main() {
     config = BotConfiguration.fromEnvironment()
     networkClient = KtorNetworkClient(client)
@@ -257,6 +261,7 @@ private suspend fun getDevicesJson(): String =
  * a handler used to die inside the dispatcher, leaving the user staring at a
  * bot that looks dead whenever the hub or network hiccuped.
  */
+@Suppress("TooGenericExceptionCaught") // outer-boundary contract below
 private fun replyTo(bot: Bot, message: Message, block: suspend () -> String) {
     val text = try {
         runBlocking { block() }

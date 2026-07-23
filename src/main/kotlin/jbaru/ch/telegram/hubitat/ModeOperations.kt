@@ -14,6 +14,9 @@ data class ModeInfo(
 object ModeOperations {
     private val json = Json { ignoreUnknownKeys = true }
     
+    // Result-boundary: any failure - network, HTTP, JSON - becomes
+    // Result.failure for the caller to fold into a chat reply.
+    @Suppress("TooGenericExceptionCaught")
     suspend fun getAllModes(
         networkClient: NetworkClient,
         makerApiAppId: String,
@@ -45,6 +48,8 @@ object ModeOperations {
             }
     }
     
+    // Result-boundary: any failure becomes Result.failure for the caller.
+    @Suppress("TooGenericExceptionCaught")
     suspend fun setMode(
         networkClient: NetworkClient,
         makerApiAppId: String,

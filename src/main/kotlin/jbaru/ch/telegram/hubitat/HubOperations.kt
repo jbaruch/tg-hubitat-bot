@@ -187,7 +187,7 @@ object HubOperations {
     }
     
     // The poll loop treats ANY read failure as "hub still rebooting" by design
-    // (see the comment inside); narrowing the catch would turn expected reboot
+    // (see pollForCompletion); narrowing the catches would turn expected reboot
     // blips into failed updates.
     @Suppress("TooGenericExceptionCaught")
     suspend fun updateHubsWithPolling(
@@ -200,35 +200,58 @@ object HubOperations {
         delayMillis: Long = 30000,
         progressCallback: suspend (String) -> Unit
     ): Result<String> {
-        // Check current and available versions for all hubs
-        val versionInfo = mutableMapOf<String, HubVersionInfo>()
-        for (hub in hubs) {
-            try {
-                val (current, available) = getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
-                versionInfo[hub.label] = HubVersionInfo(hub.label, current, available)
-            } catch (e: Exception) {
-                return Result.failure(Exception("Failed to get version info for hub ${hub.label}: ${e.message}"))
-            }
+        val versionInfo = try {
+            collectVersionInfo(hubs, networkClient, hubIp, makerApiAppId, makerApiToken)
+        } catch (e: Exception) {
+            return Result.failure(IllegalStateException(e.message, e))
         }
-        
+
         // Skip hubs that are already up to date
         val hubsNeedingUpdate = versionInfo.filter { it.value.needsUpdate }
         if (hubsNeedingUpdate.isEmpty()) {
             progressCallback("All hubs are already up to date")
             return Result.success("All hubs are already up to date")
         }
-        
         progressCallback("Hubs needing update: ${hubsNeedingUpdate.keys.joinToString(", ")}")
-        
-        // Initiate updates for hubs that need them
-        val updateProgress = UpdateProgress(
-            totalHubs = hubsNeedingUpdate.size,
-            updatedHubs = emptySet(),
-            failedHubs = emptyMap(),
-            inProgressHubs = hubsNeedingUpdate.keys.toSet()
+
+        initiateUpdates(hubs.filter { hubsNeedingUpdate.containsKey(it.label) }, networkClient, progressCallback)
+            .onFailure { return Result.failure(it) }
+
+        val finalProgress = pollForCompletion(
+            hubs, versionInfo, hubsNeedingUpdate.keys,
+            networkClient, hubIp, makerApiAppId, makerApiToken,
+            maxAttempts, delayMillis, progressCallback
         )
-        
-        for (hub in hubs.filter { hubsNeedingUpdate.containsKey(it.label) }) {
+        return summarize(finalProgress, progressCallback)
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun collectVersionInfo(
+        hubs: List<Device.Hub>,
+        networkClient: NetworkClient,
+        hubIp: String,
+        makerApiAppId: String,
+        makerApiToken: String
+    ): Map<String, HubVersionInfo> {
+        val versionInfo = mutableMapOf<String, HubVersionInfo>()
+        for (hub in hubs) {
+            try {
+                val (current, available) = getHubVersions(hub, networkClient, hubIp, makerApiAppId, makerApiToken)
+                versionInfo[hub.label] = HubVersionInfo(hub.label, current, available)
+            } catch (e: Exception) {
+                throw IllegalStateException("Failed to get version info for hub ${hub.label}: ${e.message}", e)
+            }
+        }
+        return versionInfo
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun initiateUpdates(
+        hubs: List<Device.Hub>,
+        networkClient: NetworkClient,
+        progressCallback: suspend (String) -> Unit
+    ): Result<Unit> {
+        for (hub in hubs) {
             try {
                 val response = networkClient.get(
                     "http://${hub.ip}/management/firmwareUpdate",
@@ -236,26 +259,46 @@ object HubOperations {
                 )
                 if (response.status != HttpStatusCode.OK) {
                     return Result.failure(
-                        Exception("Failed to initiate update for hub ${hub.label}: ${response.status}")
+                        IllegalStateException("Failed to initiate update for hub ${hub.label}: ${response.status}")
                     )
                 }
                 progressCallback("Update initiated for hub ${hub.label}")
             } catch (e: Exception) {
-                return Result.failure(Exception("Failed to initiate update for hub ${hub.label}: ${e.message}"))
+                return Result.failure(
+                    IllegalStateException("Failed to initiate update for hub ${hub.label}: ${e.message}", e)
+                )
             }
         }
-        
-        // Poll hub versions periodically.
-        //
-        // A hub is done when its firmware moves off the original version. While a
-        // hub reboots to apply the update, the Maker API returns empty/error
-        // responses and getHubVersions throws - that is EXPECTED mid-update
-        // progress, NOT a failure. Treat it as "still rebooting", keep the hub
-        // in-progress, and keep polling until it reports the new version. A hub
-        // that genuinely never completes surfaces as the timeout below; it is
-        // never declared failed mid-flight on a transient reboot blip (which used
-        // to end the whole watch early and mis-report a successful update).
-        var currentProgress = updateProgress
+        return Result.success(Unit)
+    }
+
+    // A hub is done when its firmware moves off the original version. While a
+    // hub reboots to apply the update, the Maker API returns empty/error
+    // responses and getHubVersions throws - that is EXPECTED mid-update
+    // progress, NOT a failure. Treat it as "still rebooting", keep the hub
+    // in-progress, and keep polling until it reports the new version. A hub
+    // that genuinely never completes surfaces as the timeout in summarize; it
+    // is never declared failed mid-flight on a transient reboot blip (which
+    // used to end the whole watch early and mis-report a successful update).
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun pollForCompletion(
+        hubs: List<Device.Hub>,
+        versionInfo: Map<String, HubVersionInfo>,
+        updating: Set<String>,
+        networkClient: NetworkClient,
+        hubIp: String,
+        makerApiAppId: String,
+        makerApiToken: String,
+        maxAttempts: Int,
+        delayMillis: Long,
+        progressCallback: suspend (String) -> Unit
+    ): UpdateProgress {
+        var currentProgress = UpdateProgress(
+            totalHubs = updating.size,
+            updatedHubs = emptySet(),
+            failedHubs = emptyMap(),
+            inProgressHubs = updating
+        )
         var attempts = 0
 
         while (!currentProgress.isComplete && attempts < maxAttempts) {
@@ -263,7 +306,6 @@ object HubOperations {
             attempts++
 
             val updatedHubs = mutableSetOf<String>()
-
             for (hubLabel in currentProgress.inProgressHubs) {
                 val hub = hubs.find { it.label == hubLabel } ?: continue
                 try {
@@ -295,27 +337,35 @@ object HubOperations {
                 )
             }
         }
-        
-        // Handle timeout scenario
-        if (!currentProgress.isComplete) {
-            val timeoutHubs = currentProgress.inProgressHubs.joinToString(", ")
+        return currentProgress
+    }
+
+    private suspend fun summarize(
+        progress: UpdateProgress,
+        progressCallback: suspend (String) -> Unit
+    ): Result<String> {
+        if (!progress.isComplete) {
+            val timeoutHubs = progress.inProgressHubs.joinToString(", ")
             progressCallback("Timeout: The following hubs did not complete update: $timeoutHubs")
-            return Result.failure(Exception("Update timeout. Hubs that did not complete: $timeoutHubs"))
+            return Result.failure(IllegalStateException("Update timeout. Hubs that did not complete: $timeoutHubs"))
         }
-        
-        // Report final results
-        val successMessage = if (currentProgress.successCount > 0) {
-            "Successfully updated ${currentProgress.successCount} hub(s): ${currentProgress.updatedHubs.joinToString(", ")}"
-        } else ""
-        
-        val failureMessage = if (currentProgress.failureCount > 0) {
-            "Failed to update ${currentProgress.failureCount} hub(s): ${currentProgress.failedHubs.entries.joinToString(", ") { "${it.key} (${it.value})" }}"
-        } else ""
-        
-        return if (currentProgress.failureCount == 0) {
+
+        val successMessage = if (progress.successCount > 0) {
+            "Successfully updated ${progress.successCount} hub(s): ${progress.updatedHubs.joinToString(", ")}"
+        } else {
+            ""
+        }
+        val failureMessage = if (progress.failureCount > 0) {
+            "Failed to update ${progress.failureCount} hub(s): " +
+                progress.failedHubs.entries.joinToString(", ") { "${it.key} (${it.value})" }
+        } else {
+            ""
+        }
+
+        return if (progress.failureCount == 0) {
             Result.success(successMessage)
         } else {
-            Result.failure(Exception("$failureMessage\n$successMessage"))
+            Result.failure(IllegalStateException("$failureMessage\n$successMessage"))
         }
     }
 }

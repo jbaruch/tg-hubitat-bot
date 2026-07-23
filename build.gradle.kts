@@ -6,18 +6,18 @@ buildscript {
             // build and never ship in the container, but force patched versions
             // to clear the Dependabot alerts against the plugin classpath.
             force(
-                "com.fasterxml.jackson.core:jackson-databind:2.18.9",
-                "com.fasterxml.jackson.core:jackson-core:2.18.9",
-                "org.apache.commons:commons-lang3:3.18.0"
+                "com.fasterxml.jackson.core:jackson-databind:2.22.1",
+                "com.fasterxml.jackson.core:jackson-core:2.22.1",
+                "org.apache.commons:commons-lang3:3.20.0"
             )
         }
     }
 }
 
 plugins {
-    kotlin("jvm") version "2.3.0-RC3"
-    kotlin("plugin.serialization") version "2.3.0-RC3"
-    id("com.google.cloud.tools.jib") version "3.5.1"
+    kotlin("jvm") version "2.5.0-dev-1962"
+    kotlin("plugin.serialization") version "2.5.0-dev-1962"
+    id("com.google.cloud.tools.jib") version "3.5.4"
     application
     jacoco
     // Renewal: the `gradle` ecosystem entry in .github/dependabot.yml
@@ -46,7 +46,7 @@ dependencies {
         // gson is pulled transitively by the telegram bot (retrofit converter-gson)
         // at 2.8.5, which has a known deserialization DoS (CVE fixed in 2.8.9).
         // Force a patched version onto the runtime classpath.
-        implementation("com.google.code.gson:gson:2.11.0") {
+        implementation("com.google.code.gson:gson:2.14.0") {
             because("2.8.5 (pulled via retrofit converter-gson) is vulnerable; 2.8.9+ is patched")
         }
     }
@@ -67,8 +67,8 @@ dependencies {
     testImplementation("io.kotest:kotest-property:$kotest_version")
     
     // Mockito for mocking
-    testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
-    testImplementation("org.mockito:mockito-core:5.18.0")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:6.3.0")
+    testImplementation("org.mockito:mockito-core:5.23.0")
     
     // Ktor mock engine for testing
     testImplementation("io.ktor:ktor-client-mock:$ktor_version")

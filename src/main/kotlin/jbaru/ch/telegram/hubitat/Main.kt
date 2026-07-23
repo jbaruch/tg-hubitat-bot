@@ -132,9 +132,10 @@ private fun Dispatcher.registerHubCommands() {
                 onSuccess = { it },
                 onFailure = {
                     // The per-hub detail already reached the chat via
-                    // progressCallback; the exception text can carry
-                    // internal URLs, so it stays in the logs.
-                    logger.error("Hub update failed", it)
+                    // progressCallback. The throwable's cause chain can carry
+                    // token-bearing request URLs, so only a redacted message
+                    // reaches the logs - not the throwable itself.
+                    logger.error("Hub update failed: {}", KtorNetworkClient.redactSecrets(it.message))
                     "Hub update failed. See the progress messages above; details are in the bot logs."
                 }
             )
@@ -145,7 +146,6 @@ private fun Dispatcher.registerHubCommands() {
         if (!isAuthorized(message)) return@command
         val chatId = ChatId.fromId(message.chat.id)
         val messages = runBlocking {
-            @Suppress("TooGenericExceptionCaught")
             try {
                 FirmwareOperations.checkFirmware(hubs, networkClient)
             } catch (e: CancellationException) {
@@ -159,7 +159,7 @@ private fun Dispatcher.registerHubCommands() {
             // short generic error; exception details (which can carry
             // internal URLs) stay in the logs. Propagation would break the
             // every-command-answers contract.
-            catch (e: Exception) {
+            catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
                 logger.error("Firmware check failed", e)
                 listOf("Firmware check failed. Check the bot logs for details.")
             }
@@ -189,7 +189,6 @@ private fun Dispatcher.registerInfoCommands() {
     command("list") {
         if (!isAuthorized(message)) return@command
         val chatId = ChatId.fromId(message.chat.id)
-        @Suppress("TooGenericExceptionCaught")
         try {
             val deviceLists = runBlocking {
                 CommandHandlers.handleListCommand(deviceManager)
@@ -212,7 +211,7 @@ private fun Dispatcher.registerInfoCommands() {
         // Emitted response: a short generic error; details stay in
         // the logs. Propagation would break the every-command-
         // answers contract.
-        catch (e: Exception) {
+        catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
             logger.error("List command failed", e)
             bot.sendMessage(
                 chatId = chatId,
@@ -292,7 +291,7 @@ private suspend fun getDevicesJson(): String =
  * bot that looks dead whenever the hub or network hiccuped.
  */
 private fun replyTo(bot: Bot, message: Message, block: suspend () -> String) {
-    val text = @Suppress("TooGenericExceptionCaught") try {
+    val text = try {
         runBlocking { block() }
     } catch (e: CancellationException) {
         // Cancellation is not a failure - it must propagate past the boundary.
@@ -305,7 +304,7 @@ private fun replyTo(bot: Bot, message: Message, block: suspend () -> String) {
     // details, which can carry internal URLs, stay in the logs). Letting
     // it propagate would break the contract that every command answers
     // the chat.
-    catch (e: Exception) {
+    catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
         logger.error("Handler for '${message.text}' failed", e)
         val command = message.text?.split(" ")?.firstOrNull() ?: "command"
         "Something went wrong handling $command. Check the bot logs for details."

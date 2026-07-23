@@ -1,4 +1,6 @@
 package jbaru.ch.telegram.hubitat
+import java.io.IOException
+import kotlinx.serialization.SerializationException
 import io.ktor.http.isSuccess
 
 import kotlinx.serialization.Serializable
@@ -14,9 +16,6 @@ data class ModeInfo(
 object ModeOperations {
     private val json = Json { ignoreUnknownKeys = true }
     
-    // Result-boundary: any failure - network, HTTP, JSON - becomes
-    // Result.failure for the caller to fold into a chat reply.
-    @Suppress("TooGenericExceptionCaught")
     suspend fun getAllModes(
         networkClient: NetworkClient,
         makerApiAppId: String,
@@ -30,7 +29,13 @@ object ModeOperations {
             )
             val modes = json.decodeFromString<List<ModeInfo>>(modesJson)
             Result.success(modes)
-        } catch (e: Exception) {
+        } catch (e: IOException) {
+            Result.failure(e)
+        } catch (e: IllegalStateException) {
+            Result.failure(e)
+        } catch (e: SerializationException) {
+            Result.failure(e)
+        } catch (e: IllegalArgumentException) {
             Result.failure(e)
         }
     }
@@ -48,8 +53,6 @@ object ModeOperations {
             }
     }
     
-    // Result-boundary: any failure becomes Result.failure for the caller.
-    @Suppress("TooGenericExceptionCaught")
     suspend fun setMode(
         networkClient: NetworkClient,
         makerApiAppId: String,
@@ -79,7 +82,13 @@ object ModeOperations {
             } else {
                 Result.failure(Exception("Failed to set mode: ${response.status}"))
             }
-        } catch (e: Exception) {
+        } catch (e: IOException) {
+            Result.failure(e)
+        } catch (e: IllegalStateException) {
+            Result.failure(e)
+        } catch (e: SerializationException) {
+            Result.failure(e)
+        } catch (e: IllegalArgumentException) {
             Result.failure(e)
         }
     }

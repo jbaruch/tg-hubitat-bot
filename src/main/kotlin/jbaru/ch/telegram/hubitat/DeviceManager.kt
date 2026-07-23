@@ -32,10 +32,6 @@ class DeviceManager(deviceListJson: String) {
         refreshDevices(deviceListJson)
     }
 
-    // Per-device resilience: any decode failure - unknown type, missing field,
-    // serializer quirk - skips that device with a warning instead of taking
-    // the whole list (and the bot) down at boot.
-    @Suppress("TooGenericExceptionCaught")
     @Synchronized
     fun refreshDevices(deviceListJson: String): Pair<Int, List<String>> {
         val format = Json { ignoreUnknownKeys = true }
@@ -45,17 +41,22 @@ class DeviceManager(deviceListJson: String) {
         // newly-installed driver with no @Serializable subclass yet) is skipped
         // with a visible warning instead of aborting the whole list and crashing
         // the bot at boot.
+        // Per-device resilience: a decode failure - unknown type, missing field,
+        // malformed element - skips that device with a warning instead of
+        // taking the whole list (and the bot) down at boot.
         val newDevices = format.parseToJsonElement(deviceListJson).jsonArray.mapNotNull { element ->
-            try {
+            onExpectedFailure(
+                onFailure = { e ->
+                    val type = element.jsonObject["type"]?.jsonPrimitive?.content ?: "unknown"
+                    val label = element.jsonObject["label"]?.jsonPrimitive?.content ?: "unknown"
+                    val message = "WARNING Skipping unsupported device (type='$type', label='$label'): " +
+                        (e.message?.substringBefore('\n') ?: e.toString())
+                    warnings.add(message)
+                    logger.warn(message.removePrefix("WARNING "))
+                    null
+                }
+            ) {
                 format.decodeFromJsonElement<Device>(element)
-            } catch (e: Exception) {
-                val type = element.jsonObject["type"]?.jsonPrimitive?.content ?: "unknown"
-                val label = element.jsonObject["label"]?.jsonPrimitive?.content ?: "unknown"
-                val message = "WARNING Skipping unsupported device (type='$type', label='$label'): " +
-                    (e.message?.substringBefore('\n') ?: e.toString())
-                warnings.add(message)
-                logger.warn(message.removePrefix("WARNING "))
-                null
             }
         }
 

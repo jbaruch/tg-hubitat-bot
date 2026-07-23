@@ -140,18 +140,24 @@ private fun Dispatcher.registerHubCommands() {
         }
     }
 
-    // Multi-message handler: dispatcher-boundary catch-all, same
-    // outer-boundary contract as replyTo.
-    @Suppress("TooGenericExceptionCaught")
     command("firmware") {
         if (!isAuthorized(message)) return@command
         val chatId = ChatId.fromId(message.chat.id)
         val messages = runBlocking {
+            @Suppress("TooGenericExceptionCaught")
             try {
                 FirmwareOperations.checkFirmware(hubs, networkClient)
-            } catch (e: Exception) {
+            }
+            // outer-boundary-process-contract: Telegram dispatcher boundary
+            // (multi-message handler, so it cannot use replyTo).
+            // Silent-failure shape: an escaping exception dies in the
+            // dispatcher and the user gets no reply. Emitted response: a
+            // short generic error; exception details (which can carry
+            // internal URLs) stay in the logs. Propagation would break the
+            // every-command-answers contract.
+            catch (e: Exception) {
                 logger.error("Firmware check failed", e)
-                listOf("Firmware check failed: ${e.message}")
+                listOf("Firmware check failed. Check the bot logs for details.")
             }
         }
         messages.forEach { bot.sendMessage(chatId = chatId, text = it) }
@@ -176,10 +182,10 @@ private fun Dispatcher.registerHubCommands() {
 }
 
 private fun Dispatcher.registerInfoCommands() {
-    @Suppress("TooGenericExceptionCaught")
     command("list") {
         if (!isAuthorized(message)) return@command
         val chatId = ChatId.fromId(message.chat.id)
+        @Suppress("TooGenericExceptionCaught")
         try {
             val deviceLists = runBlocking {
                 CommandHandlers.handleListCommand(deviceManager)
@@ -278,9 +284,8 @@ private suspend fun getDevicesJson(): String =
  * a handler used to die inside the dispatcher, leaving the user staring at a
  * bot that looks dead whenever the hub or network hiccuped.
  */
-@Suppress("TooGenericExceptionCaught") // outer-boundary contract below
 private fun replyTo(bot: Bot, message: Message, block: suspend () -> String) {
-    val text = try {
+    val text = @Suppress("TooGenericExceptionCaught") try {
         runBlocking { block() }
     }
     // outer-boundary-process-contract: Telegram dispatcher boundary.

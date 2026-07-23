@@ -9,3 +9,7 @@ style:
     # Raw strings are JSON fixtures in tests - breaking them mangles the
     # payload for no readability gain.
     excludeRawStrings: true
+  ReturnCount:
+    # Kotlin guard-clause / early-return style is idiomatic here; the default
+    # of 2 fights it. 4 still flags genuinely branchy functions.
+    max: 4

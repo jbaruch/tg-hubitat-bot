@@ -58,7 +58,7 @@ fun main() {
     deviceManager = runBlocking {
         DeviceManager(getDevicesJson())
     }
-    hubs = runBlocking { 
+    hubs = runBlocking {
         HubOperations.initializeHubs(
             deviceManager, networkClient, config.defaultHubIp,
             config.makerApiAppId, config.makerApiToken

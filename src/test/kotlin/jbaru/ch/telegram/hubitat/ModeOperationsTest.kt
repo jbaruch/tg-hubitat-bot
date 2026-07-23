@@ -10,16 +10,16 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 
 class ModeOperationsTest : FunSpec({
-    
+
     lateinit var networkClient: NetworkClient
     val makerApiAppId = "test-app-id"
     val makerApiToken = "test-token"
     val hubIp = "hubitat.local"
-    
+
     beforeEach {
         networkClient = mock()
     }
-    
+
     context("getAllModes") {
         test("should successfully retrieve and parse modes") {
             val modesJson = """
@@ -29,16 +29,16 @@ class ModeOperationsTest : FunSpec({
                     {"name": "Night", "id": 3, "active": false}
                 ]
             """.trimIndent()
-            
+
             whenever(networkClient.getBody(
                 eq("http://hubitat.local/apps/api/test-app-id/modes"),
                 eq(mapOf("access_token" to "test-token"))
             )).thenReturn(modesJson)
-            
+
             val result = ModeOperations.getAllModes(
                 networkClient, makerApiAppId, makerApiToken, hubIp
             )
-            
+
             result.isSuccess shouldBe true
             val modes = result.getOrNull()!!
             modes.size shouldBe 3
@@ -48,31 +48,31 @@ class ModeOperationsTest : FunSpec({
             modes[1].name shouldBe "Away"
             modes[1].active shouldBe false
         }
-        
+
         test("should handle network errors") {
             whenever(networkClient.getBody(any(), any()))
                 .thenThrow(IllegalStateException("Connection failed"))
-            
+
             val result = ModeOperations.getAllModes(
                 networkClient, makerApiAppId, makerApiToken, hubIp
             )
-            
+
             result.isFailure shouldBe true
             result.exceptionOrNull()?.message shouldContain "Connection failed"
         }
-        
+
         test("should handle malformed JSON") {
             whenever(networkClient.getBody(any(), any()))
                 .thenReturn("invalid json")
-            
+
             val result = ModeOperations.getAllModes(
                 networkClient, makerApiAppId, makerApiToken, hubIp
             )
-            
+
             result.isFailure shouldBe true
         }
     }
-    
+
     context("getCurrentMode") {
         test("should find and return the active mode") {
             val modesJson = """
@@ -82,20 +82,20 @@ class ModeOperationsTest : FunSpec({
                     {"name": "Night", "id": 3, "active": false}
                 ]
             """.trimIndent()
-            
+
             whenever(networkClient.getBody(any(), any())).thenReturn(modesJson)
-            
+
             val result = ModeOperations.getCurrentMode(
                 networkClient, makerApiAppId, makerApiToken, hubIp
             )
-            
+
             result.isSuccess shouldBe true
             val mode = result.getOrNull()!!
             mode.name shouldBe "Home"
             mode.id shouldBe 1
             mode.active shouldBe true
         }
-        
+
         test("should handle case when no active mode exists") {
             val modesJson = """
                 [
@@ -103,30 +103,30 @@ class ModeOperationsTest : FunSpec({
                     {"name": "Away", "id": 2, "active": false}
                 ]
             """.trimIndent()
-            
+
             whenever(networkClient.getBody(any(), any())).thenReturn(modesJson)
-            
+
             val result = ModeOperations.getCurrentMode(
                 networkClient, makerApiAppId, makerApiToken, hubIp
             )
-            
+
             result.isFailure shouldBe true
             result.exceptionOrNull()?.message shouldContain "No active mode found"
         }
-        
+
         test("should propagate network errors") {
             whenever(networkClient.getBody(any(), any()))
                 .thenThrow(IllegalStateException("Network error"))
-            
+
             val result = ModeOperations.getCurrentMode(
                 networkClient, makerApiAppId, makerApiToken, hubIp
             )
-            
+
             result.isFailure shouldBe true
             result.exceptionOrNull()?.message shouldContain "Network error"
         }
     }
-    
+
     context("setMode") {
         test("should successfully change mode with valid name") {
             val modesJson = """
@@ -136,9 +136,9 @@ class ModeOperationsTest : FunSpec({
                     {"name": "Night", "id": 3, "active": false}
                 ]
             """.trimIndent()
-            
+
             whenever(networkClient.getBody(any(), any())).thenReturn(modesJson)
-            
+
             val mockResponse = mock<io.ktor.client.statement.HttpResponse> {
                 on { status } doReturn io.ktor.http.HttpStatusCode.OK
             }
@@ -146,15 +146,15 @@ class ModeOperationsTest : FunSpec({
                 eq("http://hubitat.local/apps/api/test-app-id/modes/2"),
                 eq(mapOf("access_token" to "test-token"))
             )).thenReturn(mockResponse)
-            
+
             val result = ModeOperations.setMode(
                 networkClient, makerApiAppId, makerApiToken, hubIp, "Away"
             )
-            
+
             result.isSuccess shouldBe true
             result.getOrNull() shouldContain "Away"
         }
-        
+
         test("should handle case-insensitive mode name matching") {
             val modesJson = """
                 [
@@ -162,21 +162,21 @@ class ModeOperationsTest : FunSpec({
                     {"name": "Away", "id": 2, "active": false}
                 ]
             """.trimIndent()
-            
+
             whenever(networkClient.getBody(any(), any())).thenReturn(modesJson)
-            
+
             val mockResponse = mock<io.ktor.client.statement.HttpResponse> {
                 on { status } doReturn io.ktor.http.HttpStatusCode.OK
             }
             whenever(networkClient.get(any(), any())).thenReturn(mockResponse)
-            
+
             val result = ModeOperations.setMode(
                 networkClient, makerApiAppId, makerApiToken, hubIp, "away"
             )
-            
+
             result.isSuccess shouldBe true
         }
-        
+
         test("should return error when mode name is not found") {
             val modesJson = """
                 [
@@ -184,17 +184,17 @@ class ModeOperationsTest : FunSpec({
                     {"name": "Away", "id": 2, "active": false}
                 ]
             """.trimIndent()
-            
+
             whenever(networkClient.getBody(any(), any())).thenReturn(modesJson)
-            
+
             val result = ModeOperations.setMode(
                 networkClient, makerApiAppId, makerApiToken, hubIp, "InvalidMode"
             )
-            
+
             result.isFailure shouldBe true
             result.exceptionOrNull()?.message shouldContain "Mode not found"
         }
-        
+
         test("should handle API failures") {
             val modesJson = """
                 [
@@ -202,15 +202,15 @@ class ModeOperationsTest : FunSpec({
                     {"name": "Away", "id": 2, "active": false}
                 ]
             """.trimIndent()
-            
+
             whenever(networkClient.getBody(any(), any())).thenReturn(modesJson)
             whenever(networkClient.get(any(), any()))
                 .thenThrow(IllegalStateException("API error"))
-            
+
             val result = ModeOperations.setMode(
                 networkClient, makerApiAppId, makerApiToken, hubIp, "Away"
             )
-            
+
             result.isFailure shouldBe true
             result.exceptionOrNull()?.message shouldContain "API error"
         }

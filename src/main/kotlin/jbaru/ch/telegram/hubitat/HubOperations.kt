@@ -26,10 +26,10 @@ data class UpdateProgress(
 ) {
     val isComplete: Boolean
         get() = updatedHubs.size + failedHubs.size == totalHubs
-    
+
     val successCount: Int
         get() = updatedHubs.size
-    
+
     val failureCount: Int
         get() = failedHubs.size
 }
@@ -72,7 +72,7 @@ object HubOperations {
         }
         return initialized
     }
-    
+
     /** @return the hub with ip/managementToken set, or null when it exposes no usable localIP. */
     private suspend fun initializeHub(
         hub: Device.Hub,
@@ -128,22 +128,22 @@ object HubOperations {
         // Query the Hub Information Driver device through Maker API
         val endpoint = "http://${hubIp}/apps/api/${makerApiAppId}/devices/${hub.id}"
         val responseBody = networkClient.getBody(endpoint, mapOf("access_token" to makerApiToken))
-        
+
         validateHubInfoResponse(hub, endpoint, responseBody)
-        
+
         try {
             val json = Json.parseToJsonElement(responseBody).jsonObject
             val attributes = json["attributes"] as? JsonArray
-            
+
             // Hub Information Driver v3 exposes these attributes
             val currentVersion = attributes?.find {
                 it.jsonObject["name"]?.jsonPrimitive?.content == "firmwareVersionString"
             }?.jsonObject?.get("currentValue")?.jsonPrimitive?.content ?: ""
-            
+
             val availableVersion = attributes?.find {
                 it.jsonObject["name"]?.jsonPrimitive?.content == "hubUpdateVersion"
             }?.jsonObject?.get("currentValue")?.jsonPrimitive?.content ?: ""
-            
+
             return Pair(currentVersion, availableVersion)
         } catch (e: SerializationException) {
             throw hubInfoParseError(hub, endpoint, responseBody, e)
@@ -166,7 +166,7 @@ object HubOperations {
             e
         )
     }
-    
+
     suspend fun updateHubs(
         hubs: List<Device.Hub>,
         networkClient: NetworkClient
@@ -197,7 +197,7 @@ object HubOperations {
             Result.failure(Exception("$failureMessages\n$successMessages"))
         }
     }
-    
+
     suspend fun updateHubsWithPolling(
         hubs: List<Device.Hub>,
         networkClient: NetworkClient,

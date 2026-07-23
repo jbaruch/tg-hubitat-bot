@@ -18,23 +18,23 @@ private const val FIXED_SEED = 20260722L
 private const val PROP_ITERATIONS = 100
 
 class StringUtilsPropertyTest : FunSpec({
-    
+
     // **Feature: test-coverage-improvement, Property 5: Snake case to camel case conversion**
     test("snakeToCamelCase capitalizes each word after the first and removes underscores")
         .config(invocations = 100) {
         checkAll(PropTestConfig(seed = FIXED_SEED, iterations = PROP_ITERATIONS), Arb.string(1..50)) { input ->
             val snakeCase = input.replace(" ", "_").lowercase()
             val result = snakeCase.snakeToCamelCase()
-            
+
             // Should not contain underscores
             result shouldNotContain "_"
-            
+
             // Should start with lowercase (first word unchanged)
             val words = snakeCase.split("_")
             if (words.isNotEmpty() && words[0].isNotEmpty()) {
                 result.startsWith(words[0]) shouldBe true
             }
-            
+
             // Each word after the first should be capitalized
             if (words.size > 1) {
                 words.drop(1).forEach { word ->

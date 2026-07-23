@@ -27,18 +27,18 @@ private const val FIXED_SEED = 20260722L
 private const val PROP_ITERATIONS = 100
 
 class CommandHandlersPropertyTest : FunSpec({
-    
+
     // **Feature: test-coverage-improvement, Property 1: Command parsing correctness**
     test("command parsing should correctly extract command, device name, and arguments").config(invocations = 100) {
         val deviceManager = mock<DeviceManager>()
         val networkClient = mock<NetworkClient>()
-        
+
         checkAll(PropTestConfig(seed = FIXED_SEED, iterations = PROP_ITERATIONS), Arb.string(1..50)) { input ->
             val parts = input.split(" ").filter { it.isNotEmpty() }
             if (parts.size >= 2) {
                 val command = parts[0].filter { it.isLetterOrDigit() || it == '_' }
                 val deviceName = parts[1].filter { it.isLetterOrDigit() || it == '_' }
-                
+
                 if (command.isNotEmpty() && deviceName.isNotEmpty()) {
                     val camelCommand = command.snakeToCamelCase()
 
@@ -52,12 +52,12 @@ class CommandHandlersPropertyTest : FunSpec({
                     val message = mock<Message> {
                         on { text } doReturn messageText
                     }
-                    
+
                     val result = CommandHandlers.handleDeviceCommand(
                         message, deviceManager, networkClient,
                         "test-app", "test-token", "test-hub"
                     )
-                    
+
                     // Verify the command was parsed correctly
                     verify(deviceManager).findDevice(eq(deviceName), eq(camelCommand))
                 }

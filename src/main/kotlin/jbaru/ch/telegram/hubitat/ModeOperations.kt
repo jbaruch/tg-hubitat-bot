@@ -13,7 +13,7 @@ data class ModeInfo(
 
 object ModeOperations {
     private val json = Json { ignoreUnknownKeys = true }
-    
+
     suspend fun getAllModes(
         networkClient: NetworkClient,
         makerApiAppId: String,
@@ -33,7 +33,7 @@ object ModeOperations {
             Result.success(modes)
         }
     }
-    
+
     suspend fun getCurrentMode(
         networkClient: NetworkClient,
         makerApiAppId: String,
@@ -46,7 +46,7 @@ object ModeOperations {
                     ?: throw IllegalStateException("No active mode found")
             }
     }
-    
+
     suspend fun setMode(
         networkClient: NetworkClient,
         makerApiAppId: String,
@@ -79,7 +79,7 @@ object ModeOperations {
             }
         }
     }
-    
+
     private fun findModeIdByName(
         modes: List<ModeInfo>,
         modeName: String

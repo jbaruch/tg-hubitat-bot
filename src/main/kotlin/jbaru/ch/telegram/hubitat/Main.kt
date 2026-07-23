@@ -160,7 +160,11 @@ private fun Dispatcher.registerHubCommands() {
             // internal URLs) stay in the logs. Propagation would break the
             // every-command-answers contract.
             catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-                logger.error("Firmware check failed", e)
+                logger.error(
+                    "Firmware check failed: {}: {}",
+                    e.javaClass.simpleName,
+                    KtorNetworkClient.redactSecrets(e.message)
+                )
                 listOf("Firmware check failed. Check the bot logs for details.")
             }
         }
@@ -212,7 +216,11 @@ private fun Dispatcher.registerInfoCommands() {
         // the logs. Propagation would break the every-command-
         // answers contract.
         catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-            logger.error("List command failed", e)
+            logger.error(
+                "List command failed: {}: {}",
+                e.javaClass.simpleName,
+                KtorNetworkClient.redactSecrets(e.message)
+            )
             bot.sendMessage(
                 chatId = chatId,
                 text = "Something went wrong listing devices. Check the bot logs for details."
@@ -305,7 +313,13 @@ private fun replyTo(bot: Bot, message: Message, block: suspend () -> String) {
     // it propagate would break the contract that every command answers
     // the chat.
     catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-        logger.error("Handler for '${message.text}' failed", e)
+        // Redacted message, not the throwable: ktor exception text and cause
+        // chains can carry token-bearing request URLs.
+        logger.error(
+            "Handler for '${message.text}' failed: {}: {}",
+            e.javaClass.simpleName,
+            KtorNetworkClient.redactSecrets(e.message)
+        )
         val command = message.text?.split(" ")?.firstOrNull() ?: "command"
         "Something went wrong handling $command. Check the bot logs for details."
     }

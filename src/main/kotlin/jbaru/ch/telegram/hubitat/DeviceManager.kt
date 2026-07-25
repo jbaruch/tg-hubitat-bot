@@ -206,20 +206,33 @@ class DeviceManager(deviceListJson: String) {
         val warnings: MutableList<String> = ArrayList()
         val nameMatrix = DeviceAbbreviator()
         for (device in devices) {
-            val fullName = device.label.lowercase()
+            val fullName = device.label.lowercase().trim()
+            if (fullName.isEmpty()) {
+                val message = "WARNING Skipping device with empty label (id=${device.id})"
+                warnings.add(message)
+                logger.warn(message.removePrefix("WARNING "))
+                continue
+            }
             warnings.addAll(addToCache(cache, fullName, device))
 
             // Add name without "Light" or "Lights" if applicable
             val nameWithoutLights = removeLightSuffix(fullName)
-            if (nameWithoutLights != fullName) {
+            if (nameWithoutLights != fullName && nameWithoutLights.isNotEmpty()) {
                 warnings.addAll(addToCache(cache, nameWithoutLights, device))
             }
 
-            nameMatrix.addName(fullName)
+            try {
+                nameMatrix.addName(fullName)
+            } catch (e: IllegalArgumentException) {
+                val message = "WARNING Device name was not abbreviated: $fullName (${e.message})"
+                warnings.add(message)
+                logger.warn(message.removePrefix("WARNING "))
+            }
         }
         nameMatrix.abbreviate()
         for (device in devices) {
-            val fullName = device.label.lowercase()
+            val fullName = device.label.lowercase().trim()
+            if (fullName.isEmpty()) continue
             val abbreviation = nameMatrix.getAbbreviation(fullName)
             if (abbreviation.isSuccess) {
                 warnings.addAll(addToCache(cache, abbreviation.getOrThrow(), device))

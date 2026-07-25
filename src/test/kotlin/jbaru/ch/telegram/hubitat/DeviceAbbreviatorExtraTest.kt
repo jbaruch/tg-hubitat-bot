@@ -31,4 +31,26 @@ class DeviceAbbreviatorExtraTest {
             assertEquals("ll", living.getOrNull())
         }
     }
+
+    @Nested
+    inner class WhitespaceCases {
+        @Test
+        fun `double spaces do not crash abbreviation`() {
+            abbreviator.addName("Kitchen  Lights")
+            abbreviator.abbreviate()
+
+            // Stored under the original lowercase key path used by callers;
+            // tokens collapsed so abbreviation is still kl.
+            val result = abbreviator.getAbbreviation("kitchen  lights")
+            assertTrue(result.isSuccess)
+            assertEquals("kl", result.getOrNull())
+        }
+
+        @Test
+        fun `blank name is rejected rather than hanging or crashing later`() {
+            org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+                abbreviator.addName("   ")
+            }
+        }
+    }
 }

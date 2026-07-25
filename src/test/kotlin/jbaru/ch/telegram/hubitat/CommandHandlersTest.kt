@@ -33,8 +33,7 @@ class CommandHandlersTest : FunSpec({
                 on { text } doReturn "/on kitchen_light"
             }
             val device = Device.VirtualSwitch(1, "Kitchen Light")
-            whenever(deviceManager.findDevice(eq("kitchen_light"), eq("on")))
-                .thenReturn(Result.success(device))
+            whenever(deviceManager.findDevice(eq("kitchen_light"), any())).thenReturn(Result.success(device))
 
             val mockResponse = mock<HttpResponse> {
                 on { status } doReturn HttpStatusCode.OK
@@ -67,10 +66,10 @@ class CommandHandlersTest : FunSpec({
                 on { text } doReturn "/push button 1 extra_arg"
             }
             val device = Device.VirtualButton(1, "Button")
-            whenever(deviceManager.findDevice(any(), any()))
-                .thenReturn(Result.failure(Exception("No device found for query: probe")))
-            whenever(deviceManager.findDevice(eq("button"), eq("push")))
-                .thenReturn(Result.success(device))
+            whenever(deviceManager.findDevice(any(), any())).thenReturn(
+                Result.failure(Exception("No device found for query: probe"))
+            )
+            whenever(deviceManager.findDevice(eq("button"), any())).thenReturn(Result.success(device))
 
             val result = CommandHandlers.handleDeviceCommand(
                 message, deviceManager, networkClient,
@@ -135,10 +134,10 @@ class CommandHandlersTest : FunSpec({
                 on { text } doReturn "/push button 1"
             }
             val device = Device.VirtualButton(1, "Button")
-            whenever(deviceManager.findDevice(any(), any()))
-                .thenReturn(Result.failure(Exception("No device found for query: probe")))
-            whenever(deviceManager.findDevice(eq("button"), eq("push")))
-                .thenReturn(Result.success(device))
+            whenever(deviceManager.findDevice(any(), any())).thenReturn(
+                Result.failure(Exception("No device found for query: probe"))
+            )
+            whenever(deviceManager.findDevice(eq("button"), any())).thenReturn(Result.success(device))
 
             val mockResponse = mock<HttpResponse> {
                 on { status } doReturn HttpStatusCode.OK
@@ -159,10 +158,10 @@ class CommandHandlersTest : FunSpec({
                 on { text } doReturn "/set_level kitchen 50"
             }
             val device = Device.RoomLightsActivatorDimmer(5, "Kitchen Lights")
-            whenever(deviceManager.findDevice(any(), any()))
-                .thenReturn(Result.failure(Exception("No device found for query: probe")))
-            whenever(deviceManager.findDevice(eq("kitchen"), eq("setLevel")))
-                .thenReturn(Result.success(device))
+            whenever(deviceManager.findDevice(any(), any())).thenReturn(
+                Result.failure(Exception("No device found for query: probe"))
+            )
+            whenever(deviceManager.findDevice(eq("kitchen"), any())).thenReturn(Result.success(device))
 
             val mockResponse = mock<HttpResponse> {
                 on { status } doReturn HttpStatusCode.OK
@@ -183,8 +182,7 @@ class CommandHandlersTest : FunSpec({
                 on { text } doReturn "/on kitchen_light"
             }
             val device = Device.VirtualSwitch(1, "Kitchen Light")
-            whenever(deviceManager.findDevice(eq("kitchen_light"), eq("on")))
-                .thenReturn(Result.success(device))
+            whenever(deviceManager.findDevice(eq("kitchen_light"), any())).thenReturn(Result.success(device))
 
             val mockResponse = mock<HttpResponse> {
                 on { status } doReturn HttpStatusCode.NotFound
@@ -207,10 +205,10 @@ class CommandHandlersTest : FunSpec({
                 on { text } doReturn "/on kitchen lights"
             }
             val device = Device.VirtualSwitch(1, "Kitchen Lights")
-            whenever(deviceManager.findDevice(any(), any()))
-                .thenReturn(Result.failure(Exception("No device found for query: probe")))
-            whenever(deviceManager.findDevice(eq("kitchen lights"), eq("on")))
-                .thenReturn(Result.success(device))
+            whenever(deviceManager.findDevice(any(), any())).thenReturn(
+                Result.failure(Exception("No device found for query: probe"))
+            )
+            whenever(deviceManager.findDevice(eq("kitchen lights"), any())).thenReturn(Result.success(device))
 
             val mockResponse = mock<HttpResponse> {
                 on { status } doReturn HttpStatusCode.OK
@@ -230,10 +228,10 @@ class CommandHandlersTest : FunSpec({
                 on { text } doReturn "/push front door button 1"
             }
             val device = Device.VirtualButton(7, "Front Door Button")
-            whenever(deviceManager.findDevice(any(), any()))
-                .thenReturn(Result.failure(Exception("No device found for query: probe")))
-            whenever(deviceManager.findDevice(eq("front door button"), eq("push")))
-                .thenReturn(Result.success(device))
+            whenever(deviceManager.findDevice(any(), any())).thenReturn(
+                Result.failure(Exception("No device found for query: probe"))
+            )
+            whenever(deviceManager.findDevice(eq("front door button"), any())).thenReturn(Result.success(device))
 
             val mockResponse = mock<HttpResponse> {
                 on { status } doReturn HttpStatusCode.OK
@@ -255,12 +253,11 @@ class CommandHandlersTest : FunSpec({
             }
             val longer = Device.VirtualButton(2, "Master Bedroom Button")
             val shorter = Device.VirtualButton(3, "Master")
-            whenever(deviceManager.findDevice(any(), any()))
-                .thenReturn(Result.failure(Exception("No device found for query: probe")))
-            whenever(deviceManager.findDevice(eq("master"), eq("push")))
-                .thenReturn(Result.success(shorter))
-            whenever(deviceManager.findDevice(eq("master bedroom button"), eq("push")))
-                .thenReturn(Result.success(longer))
+            whenever(deviceManager.findDevice(any(), any())).thenReturn(
+                Result.failure(Exception("No device found for query: probe"))
+            )
+            whenever(deviceManager.findDevice(eq("master"), any())).thenReturn(Result.success(shorter))
+            whenever(deviceManager.findDevice(eq("master bedroom button"), any())).thenReturn(Result.success(longer))
 
             val mockResponse = mock<HttpResponse> {
                 on { status } doReturn HttpStatusCode.OK
@@ -281,10 +278,10 @@ class CommandHandlersTest : FunSpec({
                 on { text } doReturn "/on  kitchen  lights "
             }
             val device = Device.VirtualSwitch(1, "Kitchen Lights")
-            whenever(deviceManager.findDevice(any(), any()))
-                .thenReturn(Result.failure(Exception("No device found for query: probe")))
-            whenever(deviceManager.findDevice(eq("kitchen lights"), eq("on")))
-                .thenReturn(Result.success(device))
+            whenever(deviceManager.findDevice(any(), any())).thenReturn(
+                Result.failure(Exception("No device found for query: probe"))
+            )
+            whenever(deviceManager.findDevice(eq("kitchen lights"), any())).thenReturn(Result.success(device))
 
             val mockResponse = mock<HttpResponse> {
                 on { status } doReturn HttpStatusCode.OK
@@ -316,8 +313,9 @@ class CommandHandlersTest : FunSpec({
             val message = mock<Message> {
                 on { text } doReturn "/on unknown thing"
             }
-            whenever(deviceManager.findDevice(any(), any()))
-                .thenReturn(Result.failure(Exception("No device found for query: probe")))
+            whenever(deviceManager.findDevice(any(), any())).thenReturn(
+                Result.failure(Exception("No device found for query: probe"))
+            )
 
             val result = CommandHandlers.handleDeviceCommand(
                 message, deviceManager, networkClient,
@@ -325,6 +323,99 @@ class CommandHandlersTest : FunSpec({
             )
 
             result shouldBe "No device found for query: unknown thing"
+        }
+
+        test("does not fall through to a shorter prefix when the longer device rejects the command") {
+            // "Office Island" is a switch (no setLevel); "Office" is a dimmer.
+            // Falling through would wrongly set Office to level "Island".
+            // Stubs match the token case as the handler passes it (DeviceManager
+            // lowercases only in the real implementation).
+            val message = mock<Message> {
+                on { text } doReturn "/set_level office island"
+            }
+            val office = Device.RoomLightsActivatorDimmer(1, "Office")
+            whenever(deviceManager.findDevice(any(), any())).thenReturn(
+                Result.failure(Exception("No device found for query: probe"))
+            )
+            // Longer name exists but does not support setLevel — must stop here.
+            whenever(deviceManager.findDevice(eq("office island"), eq("setLevel"))).thenReturn(
+                Result.failure(
+                    IllegalArgumentException("Command 'setLevel' is not supported by device 'Office Island'")
+                )
+            )
+            whenever(deviceManager.findDevice(eq("office"), eq("setLevel"))).thenReturn(Result.success(office))
+
+            val result = CommandHandlers.handleDeviceCommand(
+                message, deviceManager, networkClient,
+                makerApiAppId, makerApiToken, defaultHubIp
+            )
+
+            result shouldContain "not supported by device"
+            result shouldContain "Office Island"
+            // Must not have issued an HTTP call against the shorter prefix.
+            org.mockito.kotlin.verify(networkClient, org.mockito.kotlin.never()).get(any(), any())
+        }
+
+        test("does not fall through to a shorter prefix on arity mismatch") {
+            val message = mock<Message> {
+                on { text } doReturn "/on kitchen lights extra"
+            }
+            val kitchen = Device.VirtualSwitch(1, "Kitchen Lights")
+            whenever(deviceManager.findDevice(any(), any())).thenReturn(
+                Result.failure(Exception("No device found for query: probe"))
+            )
+            whenever(deviceManager.findDevice(eq("kitchen lights"), any())).thenReturn(Result.success(kitchen))
+
+            val result = CommandHandlers.handleDeviceCommand(
+                message, deviceManager, networkClient,
+                makerApiAppId, makerApiToken, defaultHubIp
+            )
+
+            result shouldContain "Invalid number of arguments"
+        }
+
+        test("rejects set_level outside 0-100 before calling the hub") {
+            val message = mock<Message> {
+                on { text } doReturn "/set_level kitchen 150"
+            }
+            val device = Device.RoomLightsActivatorDimmer(5, "Kitchen Lights")
+            whenever(deviceManager.findDevice(any(), any())).thenReturn(
+                Result.failure(Exception("No device found for query: probe"))
+            )
+            whenever(deviceManager.findDevice(eq("kitchen"), any())).thenReturn(Result.success(device))
+
+            val result = CommandHandlers.handleDeviceCommand(
+                message, deviceManager, networkClient,
+                makerApiAppId, makerApiToken, defaultHubIp
+            )
+
+            result shouldContain "Invalid level"
+            org.mockito.kotlin.verify(networkClient, org.mockito.kotlin.never()).get(any(), any())
+        }
+
+        test("path-encodes command arguments in the Maker API URL") {
+            val device = Device.VirtualButton(1, "Button")
+            whenever(deviceManager.findDevice(any(), any())).thenReturn(
+                Result.failure(Exception("No device found for query: probe"))
+            )
+            whenever(deviceManager.findDevice(eq("button"), any())).thenReturn(Result.success(device))
+            val message = mock<Message> {
+                on { text } doReturn "/push button 1%2"
+            }
+            val mockResponse = mock<HttpResponse> {
+                on { status } doReturn HttpStatusCode.OK
+            }
+            whenever(networkClient.get(any(), any())).thenReturn(mockResponse)
+
+            CommandHandlers.handleDeviceCommand(
+                message, deviceManager, networkClient,
+                makerApiAppId, makerApiToken, defaultHubIp
+            )
+
+            org.mockito.kotlin.verify(networkClient).get(
+                argThat { contains("/push/${encodePathSegment("1%2")}") },
+                any()
+            )
         }
     }
 
@@ -502,6 +593,22 @@ class CommandHandlersTest : FunSpec({
             )
 
             result shouldBe "No open sensors found."
+        }
+
+        test("treats Open/OPEN as open case-insensitively") {
+            val sensor = Device.GenericZigbeeContactSensor(1, "Front Door")
+            whenever(deviceManager.findDevicesByType(Device.ContactSensor::class.java))
+                .thenReturn(listOf(sensor))
+            whenever(networkClient.getBody(any(), any()))
+                .thenReturn("""{"value": "OPEN"}""")
+
+            val result = CommandHandlers.handleGetOpenSensorsCommand(
+                deviceManager, networkClient,
+                makerApiAppId, makerApiToken, defaultHubIp
+            )
+
+            result shouldContain "Front Door"
+            result shouldContain "Open Sensors"
         }
     }
 })

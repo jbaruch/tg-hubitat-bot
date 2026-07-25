@@ -32,6 +32,11 @@ class StringUtilsTest : FunSpec({
         "".camelToSnakeCase() shouldBe ""
     }
 
+    test("encodePathSegment encodes spaces and reserved characters") {
+        encodePathSegment("a b") shouldBe "a%20b"
+        encodePathSegment("1%2") shouldBe "1%252"
+    }
+
     test("camelToSnakeCase round-trips snakeToCamelCase") {
         "cancel_alerts".snakeToCamelCase().camelToSnakeCase() shouldBe "cancel_alerts"
     }

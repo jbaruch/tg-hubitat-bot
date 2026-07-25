@@ -18,6 +18,8 @@ import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.CancellationException
 import jbaru.ch.telegram.hubitat.model.Device
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -38,6 +40,9 @@ private lateinit var config: BotConfiguration
 // Reassigned by /refresh while /update may be reading it from another
 // dispatcher thread; volatile so readers see a complete list, old or new.
 @Volatile private var hubs: List<Device.Hub> = emptyList()
+// Serializes device-list + hub re-init so two concurrent /refresh calls cannot
+// publish a newer DeviceManager snapshot with an older hubs list (or vice versa).
+private val refreshMutex = Mutex()
 private val client = HttpClient(CIO) {
     // Never let a hung or rebooting hub block a command handler forever.
     install(HttpTimeout) {
@@ -117,24 +122,16 @@ private fun Dispatcher.registerHubCommands() {
         if (!isAuthorized(message)) return@command
         replyTo(bot, message) {
             HubOperations.updateHubsWithPolling(
-                hubs,
-                networkClient,
-                config.defaultHubIp,
-                config.makerApiAppId,
-                config.makerApiToken,
+                hubs, networkClient, config.defaultHubIp,
+                config.makerApiAppId, config.makerApiToken,
                 progressCallback = { progressMessage ->
-                    bot.sendMessage(
-                        chatId = ChatId.fromId(message.chat.id),
-                        text = progressMessage
-                    )
+                    bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = progressMessage)
                 }
             ).fold(
                 onSuccess = { it },
                 onFailure = {
-                    // The per-hub detail already reached the chat via
-                    // progressCallback. The throwable's cause chain can carry
-                    // token-bearing request URLs, so only a redacted message
-                    // reaches the logs - not the throwable itself.
+                    // progressCallback already chat-reported per-hub detail.
+                    // Cause chains can carry token-bearing URLs — redact.
                     logger.error("Hub update failed: {}", KtorNetworkClient.redactSecrets(it.message))
                     "Hub update failed. See the progress messages above; details are in the bot logs."
                 }
@@ -149,16 +146,11 @@ private fun Dispatcher.registerHubCommands() {
             try {
                 FirmwareOperations.checkFirmware(hubs, networkClient)
             } catch (e: CancellationException) {
-                // Cancellation is not a failure - it must propagate.
                 throw e
             }
-            // outer-boundary-process-contract: Telegram dispatcher boundary
-            // (multi-message handler, so it cannot use replyTo).
-            // Silent-failure shape: an escaping exception dies in the
-            // dispatcher and the user gets no reply. Emitted response: a
-            // short generic error; exception details (which can carry
-            // internal URLs) stay in the logs. Propagation would break the
-            // every-command-answers contract.
+            // outer-boundary-process-contract: multi-message dispatcher boundary
+            // (cannot use replyTo). Silent-failure shape: no reply. Emitted:
+            // generic error; details stay in logs.
             catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
                 logger.error(
                     "Firmware check failed: {}: {}",
@@ -174,17 +166,19 @@ private fun Dispatcher.registerHubCommands() {
     command("refresh") {
         if (!isAuthorized(message)) return@command
         replyTo(bot, message) {
-            val results = CommandHandlers.handleRefreshCommand(
-                deviceManager, networkClient,
-                config.makerApiAppId, config.makerApiToken, config.defaultHubIp
-            )
-            // Re-initialize hubs too, so a hub added/changed since boot is
-            // picked up (and its ip/managementToken refreshed) without a restart.
-            hubs = HubOperations.initializeHubs(
-                deviceManager, networkClient, config.defaultHubIp,
-                config.makerApiAppId, config.makerApiToken
-            )
-            "Refresh finished, ${results.first} devices loaded. Warnings: ${results.second}"
+            // Atomic devices+hubs publish: concurrent /refresh cannot leave hubs
+            // on an older initializeHubs result while DeviceManager is newer.
+            refreshMutex.withLock {
+                val results = CommandHandlers.handleRefreshCommand(
+                    deviceManager, networkClient,
+                    config.makerApiAppId, config.makerApiToken, config.defaultHubIp
+                )
+                hubs = HubOperations.initializeHubs(
+                    deviceManager, networkClient, config.defaultHubIp,
+                    config.makerApiAppId, config.makerApiToken
+                )
+                "Refresh finished, ${results.first} devices loaded. Warnings: ${results.second}"
+            }
         }
     }
 }

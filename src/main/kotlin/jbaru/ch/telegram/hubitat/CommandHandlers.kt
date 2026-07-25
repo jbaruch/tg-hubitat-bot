@@ -21,6 +21,9 @@ object CommandHandlers {
 
     private val logger = LoggerFactory.getLogger(CommandHandlers::class.java)
     private const val MAX_MESSAGE_LENGTH = 3900
+    private const val SET_LEVEL_MIN = 0
+    private const val SET_LEVEL_MAX = 100
+    private val WHITESPACE = Regex("\\s+")
 
     suspend fun handleDeviceCommand(
         message: Message,
@@ -32,7 +35,7 @@ object CommandHandlers {
     ): String {
         // Trim + split on runs of whitespace: "/on " or doubled spaces must not
         // produce empty tokens that the multi-token name search would probe.
-        val parts = message.text?.trim()?.split(Regex("\\s+")) ?: emptyList()
+        val parts = message.text?.trim()?.split(WHITESPACE) ?: emptyList()
         if (parts.size < 2) {
             return "Please specify a device name for the command."
         }
@@ -41,47 +44,22 @@ object CommandHandlers {
         val snakeCaseCommand = parts[0].removePrefix("/").substringBefore("@")
         val camelCaseCommand = snakeCaseCommand.snakeToCamelCase()
         val tokens = parts.drop(1)
-        val fullQuery = tokens.joinToString(" ")
 
         // Device labels are multi-word ("Kitchen Lights", "Front Door Button"),
-        // so the device/args boundary is not fixed. Try the longest possible
-        // name first and shrink until a known device with the right trailing
-        // argument count matches; the longest match wins so a device whose name
-        // prefixes another's never steals the query.
-        var mismatchError: String? = null
-        var unsupportedError: String? = null
-
-        for (i in tokens.size downTo 1) {
-            val name = tokens.take(i).joinToString(" ")
-            val args = tokens.drop(i)
-            deviceManager.findDevice(name, camelCaseCommand).fold(
-                onSuccess = { device ->
-                    // findDevice only succeeds when the device supports the
-                    // command, so the op is guaranteed present here.
-                    val argCount = device.supportedOps.getValue(camelCaseCommand)
-                    if (args.size == argCount) {
-                        return runDeviceCommand(
-                            device, camelCaseCommand, args,
-                            networkClient, makerApiAppId, makerApiToken, defaultHubIp
-                        )
-                    } else if (mismatchError == null) {
-                        mismatchError =
-                            "Invalid number of arguments for /$snakeCaseCommand. Expected $argCount argument(s)."
-                    }
-                },
-                onFailure = {
-                    // findDevice signals "device exists but can't do this" with
-                    // IllegalArgumentException; anything else is "not found".
-                    if (it is IllegalArgumentException && unsupportedError == null) {
-                        unsupportedError = it.message
-                    }
-                }
+        // so the device/args boundary is not fixed. Longest cache hit wins; once
+        // any token span matches a known device, stop — falling through would
+        // let "Office" steal "/set_level Office Island" when the longer device
+        // rejects the command or has the wrong arity.
+        return when (val match = matchDeviceCommand(deviceManager, snakeCaseCommand, camelCaseCommand, tokens)) {
+            is DeviceMatch.Ready -> runDeviceCommand(
+                match.device, camelCaseCommand, match.args,
+                networkClient, makerApiAppId, makerApiToken, defaultHubIp
             )
+            is DeviceMatch.Failed -> {
+                logger.warn("Device command '{}' failed: {}", snakeCaseCommand, match.message)
+                match.message
+            }
         }
-
-        val error = mismatchError ?: unsupportedError ?: "No device found for query: $fullQuery"
-        logger.warn("Device command '{}' failed: {}", snakeCaseCommand, error)
-        return error
     }
 
     suspend fun handleListCommand(deviceManager: DeviceManager): Map<String, String> {
@@ -162,7 +140,9 @@ object CommandHandlers {
                 }
             }.awaitAll()
 
-        val openSensors = states.filter { it.second == "open" }.joinToString("\n") { it.first.label }
+        val openSensors = states
+            .filter { it.second.equals("open", ignoreCase = true) }
+            .joinToString("\n") { it.first.label }
         val unreadable = states.filter { it.second == null }.joinToString(", ") { it.first.label }
 
         val reply = buildString {
@@ -222,7 +202,9 @@ object CommandHandlers {
         makerApiToken: String,
         hubIp: String
     ): String {
-        val parts = message.text?.split(" ") ?: return "Please specify a mode name."
+        // Same trim + whitespace collapse as device commands so trailing or
+        // doubled spaces do not poison the mode name ("Away " ≠ "Away").
+        val parts = message.text?.trim()?.split(WHITESPACE) ?: emptyList()
         if (parts.size < 2) {
             return "Please specify a mode name. Usage: /set_mode <mode_name>"
         }
@@ -232,7 +214,7 @@ object CommandHandlers {
         return ModeOperations.setMode(
             networkClient, makerApiAppId, makerApiToken, hubIp, modeName
         ).fold(
-            onSuccess = { successMessage -> "Mode changed to $modeName successfully." },
+            onSuccess = { "Mode changed to $modeName successfully." },
             onFailure = { e ->
                 if (e.message?.contains("Mode not found") == true) {
                     // Get available modes to suggest
@@ -261,10 +243,23 @@ object CommandHandlers {
         makerApiToken: String,
         defaultHubIp: String
     ): String {
+        // setLevel is 0–100 on Hubitat; reject garbage before it hits the hub
+        // as a path segment that would 404 or do something surprising.
+        if (command == "setLevel") {
+            val level = args.singleOrNull()?.toIntOrNull()
+            if (level == null || level !in SET_LEVEL_MIN..SET_LEVEL_MAX) {
+                return "Invalid level for /set_level. Expected an integer " +
+                    "$SET_LEVEL_MIN-$SET_LEVEL_MAX, got: ${args.joinToString(" ")}"
+            }
+        }
+
         val fullPath = buildString {
             append("/apps/api/${makerApiAppId}/devices/${device.id}/$command")
             if (args.isNotEmpty()) {
-                append("/${args.joinToString("/")}")
+                // Encode each path segment so spaces / odd characters cannot
+                // reshape the Maker API URL (args are still allowlisted by chat).
+                append("/")
+                append(args.joinToString("/") { encodePathSegment(it) })
             }
         }
 
@@ -301,4 +296,47 @@ object CommandHandlers {
         val json = Json.parseToJsonElement(body).jsonObject
         return json["value"]?.jsonPrimitive?.content ?: "Unknown"
     }
+}
+
+
+// File-private helpers for multi-word device resolution (kept outside the
+// CommandHandlers object so it stays under detekt's TooManyFunctions limit).
+private sealed class DeviceMatch {
+    data class Ready(val device: Device, val args: List<String>) : DeviceMatch()
+    data class Failed(val message: String) : DeviceMatch()
+}
+
+private fun matchDeviceCommand(
+    deviceManager: DeviceManager,
+    snakeCaseCommand: String,
+    camelCaseCommand: String,
+    tokens: List<String>
+): DeviceMatch {
+    val fullQuery = tokens.joinToString(" ")
+    for (i in tokens.size downTo 1) {
+        val name = tokens.take(i).joinToString(" ")
+        val args = tokens.drop(i)
+        val outcome = deviceManager.findDevice(name, camelCaseCommand)
+        val device = outcome.getOrNull()
+        if (device != null) {
+            val argCount = device.supportedOps.getValue(camelCaseCommand)
+            return if (args.size == argCount) {
+                DeviceMatch.Ready(device, args)
+            } else {
+                DeviceMatch.Failed(
+                    "Invalid number of arguments for /$snakeCaseCommand. Expected $argCount argument(s)."
+                )
+            }
+        }
+        val failure = outcome.exceptionOrNull()
+        // findDevice signals "device exists but can't do this" with
+        // IllegalArgumentException; anything else is "not found" → shrink.
+        if (failure is IllegalArgumentException) {
+            return DeviceMatch.Failed(
+                failure.message
+                    ?: "Command '$camelCaseCommand' is not supported by device '$name'"
+            )
+        }
+    }
+    return DeviceMatch.Failed("No device found for query: $fullQuery")
 }

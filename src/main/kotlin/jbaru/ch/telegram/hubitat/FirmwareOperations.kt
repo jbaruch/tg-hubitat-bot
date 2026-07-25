@@ -6,14 +6,11 @@ import jbaru.ch.telegram.hubitat.model.FirmwareCatalog
 import jbaru.ch.telegram.hubitat.model.FirmwareLine
 import jbaru.ch.telegram.hubitat.model.firmwareMajor
 import jbaru.ch.telegram.hubitat.model.parseFirmwareVersion
-import java.io.IOException
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -102,7 +99,14 @@ object FirmwareOperations {
         for (hub in hubs.filter { it.ip.isNotBlank() }) {
             onExpectedFailureSuspend(
                 onFailure = { e ->
-                    logger.error("Failed to collect Z-Wave devices from hub ${hub.label}", e)
+                    // Redacted message only — ktor I/O exceptions can embed the
+                    // full request URL including access_token query params.
+                    logger.error(
+                        "Failed to collect Z-Wave devices from hub {}: {}: {}",
+                        hub.label,
+                        e.javaClass.simpleName,
+                        KtorNetworkClient.redactSecrets(e.message)
+                    )
                     hubErrors.add("${hub.label}: ${KtorNetworkClient.redactSecrets(e.message ?: e.toString())}")
                 }
             ) {
@@ -132,35 +136,31 @@ object FirmwareOperations {
         return coroutineScope {
             zwaveEntries.map { data ->
                 async {
-                    val id = data["id"]!!.jsonPrimitive.content.toInt()
-                    val base = ZwaveDeviceInfo(
+                    // Parse list fields inside the same expected-failure path as
+                    // the HTTP reads: a missing/non-int id must not NPE out of
+                    // awaitAll and kill the whole /firmware command.
+                    val provisionalName =
+                        data["name"]?.jsonPrimitive?.content ?: "unknown device"
+                    val provisional = ZwaveDeviceInfo(
                         hubLabel = hub.label,
-                        deviceId = id,
+                        deviceId = -1,
                         dni = data["dni"]?.jsonPrimitive?.content ?: "",
-                        name = data["name"]?.jsonPrimitive?.content ?: "device $id",
+                        name = provisionalName,
                         driverType = data["type"]?.jsonPrimitive?.content ?: ""
                     )
-                    semaphore.withPermit {
-                        try {
+                    onExpectedFailureSuspend(
+                        onFailure = { e -> unreadable(provisional, hub, e) }
+                    ) {
+                        val id = data["id"]?.jsonPrimitive?.content?.toIntOrNull()
+                            ?: throw IllegalArgumentException(
+                                "missing or non-integer device id in devicesList for '$provisionalName'"
+                            )
+                        val base = provisional.copy(
+                            deviceId = id,
+                            name = data["name"]?.jsonPrimitive?.content ?: "device $id"
+                        )
+                        semaphore.withPermit {
                             readDeviceFirmware(base, hub, networkClient)
-                        } catch (e: CancellationException) {
-                            // Never swallow structured-concurrency cancellation.
-                            throw e
-                        }
-                        // The expected per-device failures - network (timeouts
-                        // included: ktor's HttpRequestTimeoutException is an
-                        // IOException), the explicit IllegalStateExceptions from
-                        // readDeviceFirmware's error paths, and malformed JSON -
-                        // mark the device unreadable instead of aborting the
-                        // whole report.
-                        catch (e: IOException) {
-                            unreadable(base, hub, e)
-                        } catch (e: IllegalStateException) {
-                            unreadable(base, hub, e)
-                        } catch (e: SerializationException) {
-                            unreadable(base, hub, e)
-                        } catch (e: IllegalArgumentException) {
-                            unreadable(base, hub, e)
                         }
                     }
                 }

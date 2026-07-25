@@ -222,6 +222,20 @@ class DeviceManagerTest {
     }
 
     @Test
+    fun `test double-space labels boot without crashing`() {
+        val json = """
+            [
+                {"id": 1, "label": "Kitchen  Lights", "type": "Virtual Switch"}
+            ]
+        """.trimIndent()
+
+        val manager = DeviceManager(json)
+        assertEquals(1, manager.deviceCount)
+        // Stored under the lowercased original label (double space preserved as key).
+        assertTrue(manager.findDevice("kitchen  lights", "on").isSuccess)
+    }
+
+    @Test
     fun `test never-diverging labels boot with warnings instead of hanging`() {
         // "az" forces "ab" to fully expand into "a b"'s abbreviation; both are
         // fully expanded and can never diverge - this used to loop forever

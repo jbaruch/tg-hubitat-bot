@@ -3,7 +3,11 @@ package jbaru.ch.telegram.hubitat
 
 class DeviceAbbreviator {
     private class DeviceAbbreviation(name: String) {
-        private val tokens: List<String> = name.lowercase().split(' ')
+        // Collapse runs of whitespace and drop empties so labels like
+        // "Kitchen  Lights" (or trailing spaces) never hand token.first() an
+        // empty string and crash boot /refresh.
+        private val tokens: List<String> =
+            name.lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
         private val tokenAbbreviations: MutableList<StringBuilder> = mutableListOf()
 
         val numberOfTokens: Int
@@ -12,6 +16,9 @@ class DeviceAbbreviator {
             }
 
         init {
+            require(tokens.isNotEmpty()) {
+                "Device name has no tokens after whitespace normalization: '$name'"
+            }
             for (token in tokens) {
                 tokenAbbreviations.add(StringBuilder().append(token.first()))
             }

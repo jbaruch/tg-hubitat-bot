@@ -344,6 +344,27 @@ class FirmwareOperationsTest : FunSpec({
             devices.first { it.name == "Left Shade" }
                 .readError.shouldNotBeNull() shouldContain "deviceFirmware/details failed"
         }
+
+        test("a missing device id marks that entry unreadable instead of aborting the sweep") {
+            val networkClient = mock<NetworkClient>()
+            val listWithMissingId = """
+                {"devices": [
+                    {"data": {"dni": "016F", "name": "Broken Entry", "type": "Zooz", "isZwave": true}},
+                    {"data": {"id": 725, "dni": "016F", "name": "Closet Light", "type": "Zooz", "isZwave": true}}
+                ]}
+            """.trimIndent()
+            whenever(networkClient.getBody(argThat { endsWith("/hub2/devicesList") }, any()))
+                .thenReturn(listWithMissingId)
+            whenever(networkClient.getBody(argThat { endsWith("/device/fullJson/725") }, any()))
+                .thenReturn("""{"device": {"data": {"deviceModel": "ZEN76", "firmwareVersion": "3.60"}}}""")
+
+            val devices = FirmwareOperations.collectZwaveDevices(hub, networkClient)
+
+            devices.size shouldBe 2
+            val broken = devices.first { it.name == "Broken Entry" }
+            broken.readError.shouldNotBeNull() shouldContain "missing or non-integer device id"
+            devices.first { it.name == "Closet Light" }.firmwareVersion shouldBe "3.60"
+        }
     }
 
     context("report formatting") {

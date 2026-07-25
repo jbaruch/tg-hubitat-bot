@@ -203,5 +203,32 @@ class ModeCommandHandlersTest : FunSpec({
 
             result shouldContain "Night"
         }
+
+        test("trims trailing and doubled whitespace in the mode name") {
+            val message = mock<Message> {
+                on { text } doReturn "/set_mode  Away "
+            }
+
+            val modesJson = """
+                [
+                    {"name": "Home", "id": 1, "active": true},
+                    {"name": "Away", "id": 2, "active": false}
+                ]
+            """.trimIndent()
+
+            whenever(networkClient.getBody(any(), any())).thenReturn(modesJson)
+
+            val mockResponse = mock<io.ktor.client.statement.HttpResponse> {
+                on { status } doReturn io.ktor.http.HttpStatusCode.OK
+            }
+            whenever(networkClient.get(any(), any())).thenReturn(mockResponse)
+
+            val result = CommandHandlers.handleSetModeCommand(
+                message, networkClient, makerApiAppId, makerApiToken, hubIp
+            )
+
+            result shouldContain "Away"
+            result shouldContain "changed"
+        }
     }
 })

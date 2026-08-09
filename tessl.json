@@ -2,10 +2,10 @@
   "name": "tg-hubitat-bot",
   "dependencies": {
     "jbaruch/coding-policy": {
-      "version": "0.3.109"
+      "version": "latest"
     },
     "jbaruch/hubitat-dev": {
-      "version": "0.1.18"
+      "version": "latest"
     }
   }
 }

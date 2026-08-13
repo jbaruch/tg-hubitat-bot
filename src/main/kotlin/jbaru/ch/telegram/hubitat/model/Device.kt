@@ -121,6 +121,13 @@ sealed class Device {
     @SerialName("Zooz ZEN Plugs Advanced")
     data class ZoozZenPlugsAdvanced(override val id: Int, override val label: String) : Actuator()
 
+    // The driver a multi-outlet plug's per-endpoint children get. On a ZEN14 double plug the
+    // parent's `switch` is an OR of both outlets, so the child is the only device that reflects
+    // one outlet -- and the only one worth naming after whatever is plugged into it.
+    @Serializable
+    @SerialName("Generic Component Switch")
+    data class GenericComponentSwitch(override val id: Int, override val label: String) : Actuator()
+
     @Serializable
     @SerialName("Room Lights Activator Shade")
     data class RoomLightsActivatorShade(override val id: Int, override val label: String) : Shade()

@@ -127,6 +127,32 @@ class DeviceManagerTest {
     }
 
     @Test
+    fun `test generic component switch is controllable`() {
+        // A multi-outlet plug's per-endpoint children carry this driver. Before it was mapped the
+        // child loaded as an unknown type and was skipped -- so the outlet the lights are actually
+        // on was invisible to the bot, while its parent plug stayed controllable and switched BOTH
+        // outlets. Same device names as the live hub, deliberately.
+        val json = """
+            [
+                {"id": 612, "label": "Backyard Plug", "type": "Zooz ZEN Plugs Advanced"},
+                {"id": 1684, "label": "Backyard String Lights", "type": "Generic Component Switch"}
+            ]
+        """.trimIndent()
+
+        val manager = DeviceManager(json)
+        val (count, warnings) = manager.refreshDevices(json)
+
+        assertEquals(2, count)
+        assertTrue(warnings.isEmpty())
+
+        val lights = manager.findDevice("Backyard String Lights", "on")
+        assertTrue(lights.isSuccess)
+        assertEquals(1684, lights.getOrNull()?.id)
+        // off too -- reaching the outlet instead of the plug is the whole point.
+        assertTrue(manager.findDevice("Backyard String Lights", "off").isSuccess)
+    }
+
+    @Test
     fun `test unknown device type is skipped with a warning instead of crashing`() {
         // A newly-installed driver with no @Serializable subclass must not take
         // the whole device list (and the bot) down at boot.

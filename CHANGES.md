@@ -1,5 +1,22 @@
 # Changes Log
 
+## /update Stops Trusting the Startup Hub Snapshot
+
+### Overview
+/update reported "all hubs up to date" while two hubs sat on old firmware: the hub list was built once at bot startup, hubs unreachable at that moment were silently excluded until the next restart, and the lone surviving hub happened to be current. /update now re-discovers hubs on every invocation and names the ones it could not check.
+
+### Changes Made
+- /update re-initializes the hub list per invocation instead of reusing the startup snapshot; a hub that was down at startup is retried, not exiled
+- Hubs that fail initialization are reported in the chat by label with the (redacted) reason, in /update and in /refresh
+- An empty hub list is a failure ("No hubs are initialized"), never a vacuous "all up to date"
+- The up-to-date reply names each checked hub and its version, and is sent once (it used to arrive twice: once via the progress callback and once as the reply)
+- Telegram network logging switched from Network.Basic to Error: okhttp was logging full api.telegram.org URLs - bot token included - at INFO into the container logs
+
+### Benefits
+- A hub rebooting while the bot starts can no longer disappear from /update until the next bot restart
+- "Up to date" now means "checked and current", and says what was checked
+- The bot token stays out of the NAS docker logs
+
 ## Faster, Fault-Tolerant Sensor and Firmware Scans
 
 ### Overview

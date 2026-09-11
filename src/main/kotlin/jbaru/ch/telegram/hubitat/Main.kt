@@ -72,7 +72,9 @@ fun main() {
 
     val bot = bot {
         token = config.botToken
-        logLevel = LogLevel.Network.Basic
+        // Never Network.*: okhttp logs full api.telegram.org request URLs,
+        // which embed the bot token, at INFO into the container logs.
+        logLevel = LogLevel.Error
 
         dispatch {
             registerDeviceCommands()

@@ -18,6 +18,12 @@ data class HubVersionInfo(
     val needsUpdate: Boolean = currentVersion != availableVersion
 )
 
+data class HubInitResult(
+    val hubs: List<Device.Hub>,
+    /** Hub label -> redacted reason, for every hub that could not be initialized. */
+    val skipped: Map<String, String>
+)
+
 data class UpdateProgress(
     val totalHubs: Int,
     val updatedHubs: Set<String>,
@@ -49,13 +55,16 @@ object HubOperations {
         hubIp: String,
         makerApiAppId: String,
         makerApiToken: String
-    ): List<Device.Hub> {
+    ): HubInitResult {
         // Initialize each hub independently: a hub that doesn't expose a usable
         // localIP (or errors out) is skipped with a warning rather than taking the
         // whole startup down with an NPE. Only fully-initialized hubs are returned,
         // since a hub without ip/managementToken can't be updated or rebooted.
+        // Skips are returned by label so callers can surface them: a hub silently
+        // dropped here is otherwise invisible to /update and reads as "up to date".
         val hubs = deviceManager.findDevicesByType(Device.Hub::class.java)
         val initialized = mutableListOf<Device.Hub>()
+        val skipped = mutableMapOf<String, String>()
         // Per-hub resilience: a hub that cannot be initialized is skipped with
         // a warning, so one bad hub never blocks startup.
         for (hub in hubs) {
@@ -63,6 +72,7 @@ object HubOperations {
                 onFailure = { e ->
                     val reason = KtorNetworkClient.redactSecrets(e.message?.substringBefore('\n'))
                     logger.warn("Skipping hub '${hub.label}' (id=${hub.id}): $reason")
+                    skipped[hub.label] = reason
                     null
                 }
             ) {
@@ -70,17 +80,17 @@ object HubOperations {
             }
             if (ready != null) initialized.add(ready)
         }
-        return initialized
+        return HubInitResult(initialized, skipped)
     }
 
-    /** @return the hub with ip/managementToken set, or null when it exposes no usable localIP. */
+    /** @return the hub with ip/managementToken set; throws when it exposes no usable localIP. */
     private suspend fun initializeHub(
         hub: Device.Hub,
         networkClient: NetworkClient,
         hubIp: String,
         makerApiAppId: String,
         makerApiToken: String
-    ): Device.Hub? {
+    ): Device.Hub {
         val json = Json.parseToJsonElement(
             networkClient.getBody(
                 "http://${hubIp}/apps/api/${makerApiAppId}/devices/${hub.id}",
@@ -92,12 +102,7 @@ object HubOperations {
             ?.firstOrNull { it.jsonObject["name"]?.jsonPrimitive?.content == "localIP" }
             ?.jsonObject?.get("currentValue")?.jsonPrimitive?.content
 
-        if (ip.isNullOrBlank()) {
-            logger.warn(
-                "Skipping hub '${hub.label}' (id=${hub.id}): no localIP attribute exposed via Maker API"
-            )
-            return null
-        }
+        check(!ip.isNullOrBlank()) { "no localIP attribute exposed via Maker API" }
 
         hub.ip = ip
         hub.managementToken = networkClient.getBody("http://${ip}/hub/advanced/getManagementToken")
@@ -208,7 +213,8 @@ object HubOperations {
         delayMillis: Long = 30000,
         progressCallback: suspend (String) -> Unit
     ): Result<String> {
-        // collectVersionInfo wraps every expected failure in IllegalStateException.
+        // collectVersionInfo wraps every expected failure in IllegalStateException,
+        // and rejects an empty hub list the same way.
         val versionInfo = try {
             collectVersionInfo(hubs, networkClient, hubIp, makerApiAppId, makerApiToken)
         } catch (e: CancellationException) {
@@ -219,11 +225,13 @@ object HubOperations {
             return Result.failure(e)
         }
 
-        // Skip hubs that are already up to date
+        // Skip hubs that are already up to date. The message is only returned,
+        // not also progress-reported: the caller replies with the returned
+        // string, and sending it through both paths posted it twice.
         val hubsNeedingUpdate = versionInfo.filter { it.value.needsUpdate }
         if (hubsNeedingUpdate.isEmpty()) {
-            progressCallback("All hubs are already up to date")
-            return Result.success("All hubs are already up to date")
+            val checked = versionInfo.values.joinToString(", ") { "${it.hubLabel} (${it.currentVersion})" }
+            return Result.success("All checked hubs are up to date: $checked")
         }
         progressCallback("Hubs needing update: ${hubsNeedingUpdate.keys.joinToString(", ")}")
 
@@ -245,6 +253,12 @@ object HubOperations {
         makerApiAppId: String,
         makerApiToken: String
     ): Map<String, HubVersionInfo> {
+        // An empty hub list means nothing was checked - reporting it as "up to
+        // date" is a vacuous truth (all hubs skipped at init read exactly that
+        // way for weeks). Fail loudly instead.
+        check(hubs.isNotEmpty()) {
+            "No hubs are initialized, so nothing was checked. Check hub connectivity and retry /update."
+        }
         val versionInfo = mutableMapOf<String, HubVersionInfo>()
         for (hub in hubs) {
             onExpectedFailureSuspend(

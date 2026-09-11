@@ -68,7 +68,7 @@ fun main() {
             deviceManager, networkClient, config.defaultHubIp,
             config.makerApiAppId, config.makerApiToken
         )
-    }
+    }.hubs
 
     val bot = bot {
         token = config.botToken
@@ -121,21 +121,7 @@ private fun Dispatcher.registerHubCommands() {
     command("update") {
         if (!isAuthorized(message)) return@command
         replyTo(bot, message) {
-            HubOperations.updateHubsWithPolling(
-                hubs, networkClient, config.defaultHubIp,
-                config.makerApiAppId, config.makerApiToken,
-                progressCallback = { progressMessage ->
-                    bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = progressMessage)
-                }
-            ).fold(
-                onSuccess = { it },
-                onFailure = {
-                    // progressCallback already chat-reported per-hub detail.
-                    // Cause chains can carry token-bearing URLs — redact.
-                    logger.error("Hub update failed: {}", KtorNetworkClient.redactSecrets(it.message))
-                    "Hub update failed. See the progress messages above; details are in the bot logs."
-                }
-            )
+            runHubUpdate(bot, ChatId.fromId(message.chat.id))
         }
     }
 
@@ -173,14 +159,50 @@ private fun Dispatcher.registerHubCommands() {
                     deviceManager, networkClient,
                     config.makerApiAppId, config.makerApiToken, config.defaultHubIp
                 )
-                hubs = HubOperations.initializeHubs(
+                val init = HubOperations.initializeHubs(
                     deviceManager, networkClient, config.defaultHubIp,
                     config.makerApiAppId, config.makerApiToken
                 )
-                "Refresh finished, ${results.first} devices loaded. Warnings: ${results.second}"
+                hubs = init.hubs
+                val hubWarnings = if (init.skipped.isEmpty()) "" else {
+                    " Unreachable hubs: " +
+                        init.skipped.entries.joinToString("; ") { "${it.key} (${it.value})" }
+                }
+                "Refresh finished, ${results.first} devices loaded. Warnings: ${results.second}$hubWarnings"
             }
         }
     }
+}
+
+private suspend fun runHubUpdate(bot: Bot, chatId: ChatId): String {
+    // Re-initialize per invocation: the startup hub list is a snapshot, and a
+    // hub that was unreachable at startup stayed excluded until the next
+    // restart - /update then vacuously reported the survivors as "all up to
+    // date" while two hubs sat on old firmware.
+    val init = refreshMutex.withLock {
+        HubOperations.initializeHubs(
+            deviceManager, networkClient, config.defaultHubIp,
+            config.makerApiAppId, config.makerApiToken
+        ).also { hubs = it.hubs }
+    }
+    init.skipped.forEach { (label, reason) ->
+        bot.sendMessage(chatId = chatId, text = "Warning: hub '$label' was NOT checked - $reason")
+    }
+    return HubOperations.updateHubsWithPolling(
+        init.hubs, networkClient, config.defaultHubIp,
+        config.makerApiAppId, config.makerApiToken,
+        progressCallback = { progressMessage ->
+            bot.sendMessage(chatId = chatId, text = progressMessage)
+        }
+    ).fold(
+        onSuccess = { it },
+        onFailure = {
+            // progressCallback already chat-reported per-hub detail.
+            // Cause chains can carry token-bearing URLs — redact.
+            logger.error("Hub update failed: {}", KtorNetworkClient.redactSecrets(it.message))
+            "Hub update failed. See the progress messages above; details are in the bot logs."
+        }
+    )
 }
 
 private fun Dispatcher.registerInfoCommands() {

@@ -44,7 +44,7 @@ class HubOperationsPropertyTest : FunSpec({
                 deviceManager, networkClient, "hubitat.local", "app-id", "token"
             )
 
-            result[0].ip shouldBe ip
+            result.hubs[0].ip shouldBe ip
         }
     }
 })

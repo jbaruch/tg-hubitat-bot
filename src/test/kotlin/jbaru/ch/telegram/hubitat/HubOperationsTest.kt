@@ -56,9 +56,10 @@ class HubOperationsTest : FunSpec({
                 deviceManager, networkClient, hubIp, makerApiAppId, makerApiToken
             )
 
-            result.size shouldBe 1
-            result[0].ip shouldBe "192.168.1.100"
-            result[0].managementToken shouldBe "test-management-token"
+            result.hubs.size shouldBe 1
+            result.hubs[0].ip shouldBe "192.168.1.100"
+            result.hubs[0].managementToken shouldBe "test-management-token"
+            result.skipped shouldBe emptyMap<String, String>()
         }
 
         test("should handle multiple hubs") {
@@ -96,9 +97,9 @@ class HubOperationsTest : FunSpec({
                 deviceManager, networkClient, hubIp, makerApiAppId, makerApiToken
             )
 
-            result.size shouldBe 2
-            result[0].ip shouldBe "192.168.1.100"
-            result[1].ip shouldBe "192.168.1.101"
+            result.hubs.size shouldBe 2
+            result.hubs[0].ip shouldBe "192.168.1.100"
+            result.hubs[1].ip shouldBe "192.168.1.101"
         }
 
         test("should skip a hub with no localIP instead of crashing, keeping the good ones") {
@@ -119,9 +120,12 @@ class HubOperationsTest : FunSpec({
                 deviceManager, networkClient, hubIp, makerApiAppId, makerApiToken
             )
 
-            // Only the good hub is returned; the bad one is skipped, not fatal.
-            result.map { it.label } shouldBe listOf("Good Hub")
-            result[0].ip shouldBe "192.168.1.100"
+            // Only the good hub is returned; the bad one is skipped, not fatal,
+            // and the skip is reported by label so callers can surface it.
+            result.hubs.map { it.label } shouldBe listOf("Good Hub")
+            result.hubs[0].ip shouldBe "192.168.1.100"
+            result.skipped.keys shouldBe setOf("Bad Hub")
+            result.skipped["Bad Hub"]!! shouldContain "no localIP"
         }
     }
 
@@ -367,8 +371,11 @@ class HubOperationsTest : FunSpec({
             ) { messages.add(it) }
 
             result.isSuccess shouldBe true
-            result.getOrNull() shouldContain "already up to date"
-            messages.any { it.contains("already up to date") } shouldBe true
+            result.getOrNull() shouldContain "All checked hubs are up to date"
+            result.getOrNull() shouldContain "Hub 1 (2.3.4.150)"
+            // Returned only - the caller replies with it; a progress copy
+            // posted the same message twice.
+            messages.none { it.contains("up to date") } shouldBe true
         }
 
         test("should successfully update hubs with polling") {

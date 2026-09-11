@@ -132,7 +132,35 @@ class HubUpdateIntegrationTest : FunSpec({
         )
 
         result.isSuccess shouldBe true
-        result.getOrNull() shouldContain "All hubs are already up to date"
+        result.getOrNull() shouldContain "All checked hubs are up to date"
+        result.getOrNull() shouldContain "Test Hub (2.3.9.184)"
+        // The reply carries the message once: it must not also arrive as a
+        // progress message (that posted the same text twice to the chat).
+        progressMessages.none { it.contains("up to date") } shouldBe true
+    }
+
+    test("empty hub list is a failure, not a vacuous all-up-to-date") {
+        val mockEngine = MockEngine { _ ->
+            respond(
+                content = ByteReadChannel("should never be called"),
+                status = HttpStatusCode.OK
+            )
+        }
+        val networkClient = KtorNetworkClient(HttpClient(mockEngine))
+
+        val result = HubOperations.updateHubsWithPolling(
+            hubs = emptyList(),
+            networkClient = networkClient,
+            hubIp = "hubitat.local",
+            makerApiAppId = "test-app",
+            makerApiToken = "test-token",
+            maxAttempts = 1,
+            delayMillis = 100,
+            progressCallback = { }
+        )
+
+        result.isFailure shouldBe true
+        result.exceptionOrNull()?.message shouldContain "No hubs are initialized"
     }
 
     test("hub update flow with network errors") {

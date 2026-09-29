@@ -6,8 +6,8 @@ buildscript {
             // build and never ship in the container, but force patched versions
             // to clear the Dependabot alerts against the plugin classpath.
             force(
-                "com.fasterxml.jackson.core:jackson-databind:2.18.9",
-                "com.fasterxml.jackson.core:jackson-core:2.18.9",
+                "com.fasterxml.jackson.core:jackson-databind:2.18.10",
+                "com.fasterxml.jackson.core:jackson-core:2.18.10",
                 "org.apache.commons:commons-lang3:3.18.0"
             )
         }

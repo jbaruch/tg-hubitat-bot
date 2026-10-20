@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Refresh catalog from vendor servers
         id: refresh
@@ -25,7 +25,7 @@ jobs:
       - name: Open PR with catalog changes
         id: pr
         if: steps.refresh.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           branch: firmware-catalog-refresh
           commit-message: 'Refresh firmware catalog from vendor servers'

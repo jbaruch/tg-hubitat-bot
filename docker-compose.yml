@@ -3,6 +3,13 @@ services:
     image: jbaru.ch/tg-hubitat-bot:${TAG:-latest}
     container_name: jbaru.ch_tg-hubitat-bot-1
     restart: unless-stopped
+    # Without a limit the JVM sizes its max heap at 25% of host RAM (~2 GB on
+    # an 8 GB NAS), lets the heap grow lazily, and the dead pages end up in
+    # host swap. The cap makes UseContainerSupport size the heap from 512m;
+    # MaxRAMPercentage gives the heap half of it and leaves the rest for
+    # metaspace, threads and the code cache.
+    mem_limit: 512m
+    memswap_limit: 512m
     environment:
       BOT_TOKEN: ${BOT_TOKEN}
       MAKER_API_APP_ID: ${MAKER_API_APP_ID}
@@ -10,3 +17,4 @@ services:
       CHAT_ID: ${CHAT_ID:-}
       ALLOWED_CHAT_IDS: ${ALLOWED_CHAT_IDS:-}
       DEFAULT_HUB_IP: ${DEFAULT_HUB_IP:-hubitat.local}
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=50
